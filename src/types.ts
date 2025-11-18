@@ -48,7 +48,7 @@ export type SchemaTable = {
 /**
  * Defines an entire database, with a list of tables and other meta-data.
  */
-export type SchemaDatabase = {
-    tables: Record<string, SchemaTable>,
+export type SchemaDatabase<TABLES extends Record<string, SchemaTable>> = {
+    tables: TABLES,
 }
 
