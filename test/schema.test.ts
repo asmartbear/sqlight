@@ -18,7 +18,7 @@ const testSchema = SCHEMA({
 
 test('integers from INT', () => {
     const table = testSchema.from("user", "u")
-    const id = table.col('id')
+    const id = table.col.id
     T.be(id.columnName, "id")
     T.be(id.type, "INTEGER")
     T.be(id.canBeNull(), false)

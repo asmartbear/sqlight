@@ -33,19 +33,20 @@ class SqlFromTable<
 > {
     public readonly table
 
+    /** SQL expressions for columns in this table. */
+    public readonly col: { [K in keyof TABLES[TABLENAME]["columns"] & string]: SqlColumn<K, TABLES[TABLENAME]["columns"][K]> }
+
     constructor(
         tables: TABLES,
         public readonly tableName: TABLENAME,
         public readonly alias: TALIAS,
     ) {
         this.table = tables[tableName]
-    }
-
-    /**
-     * Returns the SQL expression referencing a column in this table.
-     */
-    col<COLNAME extends keyof TABLES[TABLENAME]["columns"] & string>(columnName: COLNAME) {
-        return new SqlColumn<COLNAME, TABLES[TABLENAME]["columns"][COLNAME]>(this.alias, columnName, this.table.columns[columnName] as any)
+        this.col = Object.fromEntries(
+            Object.entries(tables[tableName].columns).map(
+                ([field, col]) => [field, new SqlColumn(this.alias, field, col)]
+            )
+        ) as any
     }
 }
 
