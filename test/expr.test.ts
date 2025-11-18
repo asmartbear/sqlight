@@ -75,43 +75,42 @@ test('TYPE', () => {
 test('comparisons', () => {
     let s = S.EXPR("foo").eq("bar")
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "'foo' = 'bar'")
-    T.be(s.toSql(true), "('foo' = 'bar')")
+    T.be(s.toSql(false), "'foo'='bar'")
+    T.be(s.toSql(true), "('foo'='bar')")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR("foo").ne("bar")
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "'foo' != 'bar'")
-    T.be(s.toSql(true), "('foo' != 'bar')")
+    T.be(s.toSql(false), "'foo'!='bar'")
+    T.be(s.toSql(true), "('foo'!='bar')")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR("foo").lt("bar")
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "'foo' < 'bar'")
-    T.be(s.toSql(true), "('foo' < 'bar')")
+    T.be(s.toSql(false), "'foo'<'bar'")
+    T.be(s.toSql(true), "('foo'<'bar')")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR("foo").le("bar")
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "'foo' <= 'bar'")
-    T.be(s.toSql(true), "('foo' <= 'bar')")
+    T.be(s.toSql(false), "'foo'<='bar'")
+    T.be(s.toSql(true), "('foo'<='bar')")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR(321).gt(123)
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "321 > 123")
-    T.be(s.toSql(true), "(321 > 123)")
+    T.be(s.toSql(false), "321>123")
+    T.be(s.toSql(true), "(321>123)")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR(321).ge(123)
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "321 >= 123")
-    T.be(s.toSql(true), "(321 >= 123)")
+    T.be(s.toSql(false), "321>=123")
+    T.be(s.toSql(true), "(321>=123)")
     T.be(s.canBeNull(), false)
 })
 
 test('add/sub/mul', () => {
-
     for (const op of [{
         op: '+', f: (lhs: number, rhs: number) => S.EXPR(lhs).add(rhs),
     }, {
@@ -121,26 +120,26 @@ test('add/sub/mul', () => {
     }]) {
         let s = op.f(123, 456)
         T.be(s.type, "INTEGER")
-        T.be(s.toSql(false), `123 ${op.op} 456`)
-        T.be(s.toSql(true), `(123 ${op.op} 456)`)
+        T.be(s.toSql(false), `123${op.op}456`)
+        T.be(s.toSql(true), `(123${op.op}456)`)
         T.be(s.canBeNull(), false)
 
         s = op.f(123, 4.56)
         T.be(s.type, "REAL")
-        T.be(s.toSql(false), `123 ${op.op} 4.56`)
-        T.be(s.toSql(true), `(123 ${op.op} 4.56)`)
+        T.be(s.toSql(false), `123${op.op}4.56`)
+        T.be(s.toSql(true), `(123${op.op}4.56)`)
         T.be(s.canBeNull(), false)
 
         s = op.f(1.23, 456)
         T.be(s.type, "REAL")
-        T.be(s.toSql(false), `1.23 ${op.op} 456`)
-        T.be(s.toSql(true), `(1.23 ${op.op} 456)`)
+        T.be(s.toSql(false), `1.23${op.op}456`)
+        T.be(s.toSql(true), `(1.23${op.op}456)`)
         T.be(s.canBeNull(), false)
 
         s = op.f(1.23, 4.56)
         T.be(s.type, "REAL")
-        T.be(s.toSql(false), `1.23 ${op.op} 4.56`)
-        T.be(s.toSql(true), `(1.23 ${op.op} 4.56)`)
+        T.be(s.toSql(false), `1.23${op.op}4.56`)
+        T.be(s.toSql(true), `(1.23${op.op}4.56)`)
         T.be(s.canBeNull(), false)
     }
 })
@@ -149,26 +148,26 @@ test('add/sub/mul', () => {
 test('div', () => {
     let s = S.EXPR(123).div(456)
     T.be(s.type, "REAL")
-    T.be(s.toSql(false), "123 / 456")
-    T.be(s.toSql(true), "(123 / 456)")
+    T.be(s.toSql(false), "123/456")
+    T.be(s.toSql(true), "(123/456)")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR(123).div(4.56)
     T.be(s.type, "REAL")
-    T.be(s.toSql(false), "123 / 4.56")
-    T.be(s.toSql(true), "(123 / 4.56)")
+    T.be(s.toSql(false), "123/4.56")
+    T.be(s.toSql(true), "(123/4.56)")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR(1.23).div(456)
     T.be(s.type, "REAL")
-    T.be(s.toSql(false), "1.23 / 456")
-    T.be(s.toSql(true), "(1.23 / 456)")
+    T.be(s.toSql(false), "1.23/456")
+    T.be(s.toSql(true), "(1.23/456)")
     T.be(s.canBeNull(), false)
 
     s = S.EXPR(1.23).div(4.56)
     T.be(s.type, "REAL")
-    T.be(s.toSql(false), "1.23 / 4.56")
-    T.be(s.toSql(true), "(1.23 / 4.56)")
+    T.be(s.toSql(false), "1.23/4.56")
+    T.be(s.toSql(true), "(1.23/4.56)")
     T.be(s.canBeNull(), false)
 })
 
@@ -207,21 +206,35 @@ test('coalesce', () => {
 test('concat', () => {
     let s = S.CONCAT("foo", "bar", "baz")
     T.be(s.type, "TEXT")
-    T.be(s.toSql(false), "'foo' || 'bar' || 'baz'")
-    T.be(s.toSql(true), "('foo' || 'bar' || 'baz')")
+    T.be(s.toSql(false), "'foo'||'bar'||'baz'")
+    T.be(s.toSql(true), "('foo'||'bar'||'baz')")
     T.be(s.canBeNull(), false)
+})
+
+test('and/or', () => {
+    for (const op of [{
+        op: 'AND', f: (lhs: boolean, rhs: boolean) => S.AND(lhs, rhs),
+    }, {
+        op: 'OR', f: (lhs: boolean, rhs: boolean) => S.OR(lhs, rhs),
+    }]) {
+        let s = op.f(true, false)
+        T.be(s.type, "BOOLEAN")
+        T.be(s.toSql(false), `TRUE ${op.op} FALSE`)
+        T.be(s.toSql(true), `(TRUE ${op.op} FALSE)`)
+        T.be(s.canBeNull(), false)
+    }
 })
 
 test('case', () => {
     let s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]])
     T.be(s.type, "INTEGER")
-    T.be(s.toSql(false), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 END")
-    T.be(s.toSql(true), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 END")
+    T.be(s.toSql(false), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 END")
+    T.be(s.toSql(true), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 END")
     T.be(s.canBeNull(), true, "because there's no ELSE")
 
     s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]], -1)
     T.be(s.type, "INTEGER")
-    T.be(s.toSql(false), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 ELSE -1 END")
-    T.be(s.toSql(true), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 ELSE -1 END")
+    T.be(s.toSql(false), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 ELSE -1 END")
+    T.be(s.toSql(true), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 ELSE -1 END")
     T.be(s.canBeNull(), false)
 })

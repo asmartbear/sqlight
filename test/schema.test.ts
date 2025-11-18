@@ -41,7 +41,7 @@ test('SELECT with single FROM', () => {
 
     select.select('myId', u.col.id)
     select.select('super', CONCAT(u.col.login, "-taco"))
-    T.be(select.toSql(), `SELECT u.id AS myId, u.login || '-taco' AS super\nFROM user u`)
+    T.be(select.toSql(), `SELECT u.id AS myId, u.login||'-taco' AS super\nFROM user u`)
 })
 
 test('SELECT with simple JOIN', () => {
@@ -49,5 +49,5 @@ test('SELECT with simple JOIN', () => {
     const u1 = select.from("u1", "user")
     const u2 = select.from("u2", "user", 'JOIN', u2 => u2.col.login.eq(u1.col.login))
     select.select('dup_login', u2.col.login)
-    T.be(select.toSql(), `SELECT u2.login AS dup_login\nFROM user u1 JOIN user u2 ON (u2.login = u1.login)`)
+    T.be(select.toSql(), `SELECT u2.login AS dup_login\nFROM user u1 JOIN user u2 ON (u2.login=u1.login)`)
 })
