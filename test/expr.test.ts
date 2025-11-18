@@ -204,6 +204,14 @@ test('coalesce', () => {
     T.be(s.canBeNull(), false)
 })
 
+test('concat', () => {
+    let s = S.CONCAT("foo", "bar", "baz")
+    T.be(s.type, "TEXT")
+    T.be(s.toSql(false), "'foo' || 'bar' || 'baz'")
+    T.be(s.toSql(true), "('foo' || 'bar' || 'baz')")
+    T.be(s.canBeNull(), false)
+})
+
 test('case', () => {
     let s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]])
     T.be(s.type, "INTEGER")

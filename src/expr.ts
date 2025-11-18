@@ -104,6 +104,11 @@ export function COALESCE<D extends SqlType>(...list: readonly SqlInputValue<D>[]
     return new SqlCoalesce(EXPRs(list))
 }
 
+/** Concatenates strings */
+export function CONCAT(...list: readonly SqlInputValue<'TEXT'>[]): SqlExpression<'TEXT'> {
+    return new SqlConcat(EXPRs(list))
+}
+
 /**
  * A series of `CASE WHEN ... THEN ... END` expressions as tuples, and optionally another expression for `ELSE`.
  * If you don't have an expression for `ELSE`, it will return `NULL`.
@@ -226,6 +231,24 @@ class SqlCoalesce<D extends SqlType> extends SqlExpression<D> {
 
     toSql() {
         return `COALESCE(${this.list.map(e => e.toSql(false)).join(',')})`
+    }
+}
+
+class SqlConcat extends SqlExpression<'TEXT'> {
+    constructor(
+        private readonly list: readonly SqlExpression<'TEXT'>[],
+    ) {
+        super('TEXT')
+    }
+
+    canBeNull(): boolean {
+        return !this.list.every(s => !s.canBeNull())
+    }
+
+    toSql(grouped: boolean) {
+        let sql = this.list.map(e => e.toSql(true)).join(' || ')
+        if (grouped) sql = '(' + sql + ')'
+        return sql
     }
 }
 

@@ -1,6 +1,6 @@
 import { invariant } from './invariant';
 import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase } from './types'
-import { SqlExpression } from './expr'
+import { SqlExpression, SqlInputValue, EXPR } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
 export function SCHEMA<TABLES extends Record<string, SchemaTable>>(schema: SchemaDatabase<TABLES>): SqlSchema<TABLES> {
@@ -15,6 +15,11 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         public readonly schema: SchemaDatabase<TABLES>,
     ) { }
 
+    /** Starts a new SELECT expression. */
+    select() {
+        return new SqlSelect(this)
+    }
+
     /**
      * Creates a table for a "from" clause, wrapping a table with an alias.
      */
@@ -23,9 +28,7 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
     }
 }
 
-/**
- * A `FROM` reference to a table, with an alias.
- */
+/** A reference to a table with an alias. */
 class SqlFromTable<
     TABLES extends Record<string, SchemaTable>,
     TABLENAME extends keyof TABLES,
@@ -50,6 +53,7 @@ class SqlFromTable<
     }
 }
 
+/** SQL expression for a column in an aliased table. */
 class SqlColumn<
     COLNAME extends string,
     COLUMN extends SchemaColumn,
@@ -68,9 +72,58 @@ class SqlColumn<
     toSql() { return `${this.tableAlias}.${this.columnName}` }
 }
 
-/**
- * A `FROM` clause, containing a set of tables with joins.
- */
+/** A SQL select expression. */
+class SqlSelect<TABLES extends Record<string, SchemaTable>> {
+
+    private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
+    private readonly fromTables = new Map<string, SqlFromTable<TABLES, string, string>>()
+
+    constructor(
+        public readonly schema: SqlSchema<TABLES>
+    ) {
+
+    }
+
+    /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
+    select(alias: string, sql: SqlInputValue<SqlType>) {
+        this.selectSql.set(alias, EXPR(sql))
+    }
+
+    /**
+     * Creates a table for a "from" clause, wrapping a table with an alias.
+     */
+    from<TABLENAME extends keyof TABLES, TALIAS extends string>(tableName: TABLENAME, alias: TALIAS) {
+        const t = new SqlFromTable(this.schema.schema.tables, tableName, alias)
+        this.fromTables.set(alias, t as any)
+        return t
+    }
+
+    toSql(): string {
+        const clauses = Array.from(this.selectSql.entries())
+        if (clauses.length == 0) return 'SELECT 1'        // corner case
+
+        // SELECT
+        let pieces: string[] = []
+        pieces.push(
+            'SELECT ' + clauses.map(
+                ([alias, expr]) => `${expr.toSql(false)} AS ${alias}`
+            ).join(', ')
+        )
+
+        // FROM
+        if (this.fromTables.size) {
+            const tableSql = Array.from(this.fromTables.values()).map(
+                t => `${t.tableName} ${t.alias}`
+            )
+            pieces.push('FROM ' + tableSql.join(', '))
+        }
+
+        // done
+        return pieces.join('\n')
+    }
+}
+
+/** A 'from' clause, with aliased tables and joins. */
 // export class SqlFrom<S extends SchemaDatabase> {
 //     private readonly froms: SqlFromTable<S, string, string>[] = []
 
