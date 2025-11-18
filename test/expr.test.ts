@@ -159,6 +159,14 @@ test('div', () => {
     T.be(s.canBeNull(), false)
 })
 
+test('is null', () => {
+    const s = S.EXPR("foo").isNull()
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), "'foo' IS NULL")
+    T.be(s.toSql(true), "'foo' IS NULL")
+    T.be(s.canBeNull(), false)
+})
+
 test('is not null', () => {
     const s = S.EXPR("foo").isNotNull()
     T.be(s.type, "BOOLEAN")
@@ -176,7 +184,7 @@ test('in list', () => {
 })
 
 test('coalesce', () => {
-    let s = S.EXPR("foo").coalesce("bar")
+    let s = S.COALESCE("foo", "bar")
     T.be(s.type, "TEXT")
     T.be(s.toSql(false), "COALESCE('foo','bar')")
     T.be(s.toSql(true), "COALESCE('foo','bar')")

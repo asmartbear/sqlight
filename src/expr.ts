@@ -52,6 +52,7 @@ export function EXPR<V extends string | boolean | number | Buffer>(x: V): SqlExp
 export function EXPR<D extends SqlType>(x: SqlExpression<D>): typeof x;             // pass-through when we know it
 export function EXPR<D extends SqlType>(x: SqlInputValue<D>): SqlExpression<D>;     // conversion when it's any input value
 export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer): SqlExpression<any> {
+    // istanbul ignore next
     if (x instanceof SqlExpression) return x
     if (typeof x === "string") return STR(x)
     if (typeof x === "number") return Number.isInteger(x) ? INT(x) : FLOAT(x)
@@ -65,6 +66,11 @@ export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer)
  */
 export function EXPRs<D extends SqlType>(list: SqlInputValue<D>[]): SqlExpression<D>[] {
     return list.map(EXPR) as any
+}
+
+/** Returns the first non-null expression in a list of expressions */
+export function COALESCE<D extends SqlType>(...list: SqlInputValue<D>[]): SqlExpression<D> {
+    return new SqlCoalesce(EXPRs(list))
 }
 
 /**
@@ -88,51 +94,26 @@ export abstract class SqlExpression<D extends SqlType> {
      */
     abstract canBeNull(): boolean
 
-    /** Boolean result of asking whether this expression is NULL */
-    isNotNull(): SqlExpression<'BOOLEAN'> {
-        return new SqlIsNotNull(this)
-    }
+    /** Boolean result of asking whether this expression is `NOT NULL` */
+    isNotNull(): SqlExpression<'BOOLEAN'> { return new SqlIsNotNull(this) }
 
-    /** Returns the first non-null expression */
-    coalesce(...rhs: SqlInputValue<D>[]): SqlExpression<D> {
-        return new SqlCoalesce([this, ...EXPRs(rhs)])
-    }
+    /** Boolean result of asking whether this expression is `NULL` */
+    isNull(): SqlExpression<'BOOLEAN'> { return new SqlIsNull(this) }
 
-    eq(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '=', this, EXPR(rhs))
-    }
-    ne(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '!=', this, EXPR(rhs))
-    }
-    lt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '<', this, EXPR(rhs))
-    }
-    le(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '<=', this, EXPR(rhs))
-    }
-    gt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '>', this, EXPR(rhs))
-    }
-    ge(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> {
-        return new SqlBinaryOperator('BOOLEAN', '>=', this, EXPR(rhs))
-    }
+    eq(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '=', this, EXPR(rhs)) }
+    ne(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '!=', this, EXPR(rhs)) }
+    lt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '<', this, EXPR(rhs)) }
+    le(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '<=', this, EXPR(rhs)) }
+    gt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '>', this, EXPR(rhs)) }
+    ge(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '>=', this, EXPR(rhs)) }
 
-    add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> {
-        return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs))
-    }
-    sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> {
-        return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs))
-    }
-    mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> {
-        return new SqlBinaryArithmeticOperator('*', this as any, EXPR(rhs))
-    }
-    div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> {
-        return new SqlBinaryOperator('REAL', '/', this, EXPR(rhs))
-    }
+    add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs)) }
+    sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs)) }
+    mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('*', this as any, EXPR(rhs)) }
+    div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlBinaryOperator('REAL', '/', this, EXPR(rhs)) }
 
-    inList(list: SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> {
-        return new SqlInList(this, EXPRs(list))
-    }
+    /** Boolean of whether this value is in the given list of values */
+    inList(list: SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> { return new SqlInList(this, EXPRs(list)) }
 }
 
 /**
@@ -154,13 +135,15 @@ class SqlLiteral<D extends SqlType, T extends NativeFor<D>> extends SqlExpressio
     }
 }
 
-class SqlIsNotNull extends SqlExpression<'BOOLEAN'> {
-    constructor(
-        private readonly ex: SqlExpression<any>,
-    ) { super('BOOLEAN') }
-
+class SqlIsNull extends SqlExpression<'BOOLEAN'> {
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN') }
     canBeNull(): boolean { return false }
+    toSql() { return `${this.ex.toSql(true)} IS NULL` }
+}
 
+class SqlIsNotNull extends SqlExpression<'BOOLEAN'> {
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN') }
+    canBeNull(): boolean { return false }
     toSql() { return `${this.ex.toSql(true)} IS NOT NULL` }
 }
 
