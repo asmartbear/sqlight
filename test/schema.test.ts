@@ -16,33 +16,38 @@ const testSchema = SCHEMA({
     }
 })
 
-test('schema columns', () => {
-    const table = testSchema.from("user", "u")
-
-    const id = table.col.id
-    T.be(id.columnName, "id")
-    T.be(id.type, "INTEGER")
-    T.be(id.canBeNull(), false)
-    T.be(id.toSql(), "u.id")
-
-    const apiKey = table.col.apiKey
-    T.be(apiKey.columnName, "apiKey")
-    T.be(apiKey.type, "TEXT")
-    T.be(apiKey.canBeNull(), true)
-    T.be(apiKey.toSql(), "u.apiKey")
-})
-
-test('select with pure expressions', () => {
+test('SELECT with no tables', () => {
     const select = testSchema.select()
     T.be(select.toSql(), "SELECT 1")
     select.select('foo', 'bar')
     T.be(select.toSql(), `SELECT 'bar' AS foo`)
 })
 
-test('select with single from', () => {
+test('SELECT with single FROM', () => {
     const select = testSchema.select()
-    const u = select.from("user", "u")
+    const u = select.from("u", "user")
+
+    const id = u.col.id
+    T.be(id.columnName, "id")
+    T.be(id.type, "INTEGER")
+    T.be(id.canBeNull(), false)
+    T.be(id.toSql(), "u.id")
+
+    const apiKey = u.col.apiKey
+    T.be(apiKey.columnName, "apiKey")
+    T.be(apiKey.type, "TEXT")
+    T.be(apiKey.canBeNull(), true)
+    T.be(apiKey.toSql(), "u.apiKey")
+
     select.select('myId', u.col.id)
     select.select('super', CONCAT(u.col.login, "-taco"))
     T.be(select.toSql(), `SELECT u.id AS myId, u.login || '-taco' AS super\nFROM user u`)
+})
+
+test('SELECT with simple JOIN', () => {
+    const select = testSchema.select()
+    const u1 = select.from("u1", "user")
+    const u2 = select.from("u2", "user", 'JOIN', u2 => u2.col.login.eq(u1.col.login))
+    select.select('dup_login', u2.col.login)
+    T.be(select.toSql(), `SELECT u2.login AS dup_login\nFROM user u1 JOIN user u2 ON (u2.login = u1.login)`)
 })

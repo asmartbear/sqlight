@@ -19,13 +19,6 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
     select() {
         return new SqlSelect(this)
     }
-
-    /**
-     * Creates a table for a "from" clause, wrapping a table with an alias.
-     */
-    from<TABLENAME extends keyof TABLES, TALIAS extends string>(tableName: TABLENAME, alias: TALIAS) {
-        return new SqlFromTable(this.schema.tables, tableName, alias)
-    }
 }
 
 /** A reference to a table with an alias. */
@@ -72,11 +65,20 @@ class SqlColumn<
     toSql() { return `${this.tableAlias}.${this.columnName}` }
 }
 
+export type SqlJoinType = 'JOIN' | 'LEFT JOIN' | 'CROSS JOIN'
+
+/** Internal type for a table, optionally with some join expression. */
+type JoinedTable<TABLES extends Record<string, SchemaTable>, TABLENAME extends keyof TABLES, TALIAS extends string> = {
+    table: SqlFromTable<TABLES, TABLENAME, TALIAS>,
+    joinType?: SqlJoinType,
+    joiner?: SqlExpression<'BOOLEAN'>,
+}
+
 /** A SQL select expression. */
 class SqlSelect<TABLES extends Record<string, SchemaTable>> {
 
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
-    private readonly fromTables = new Map<string, SqlFromTable<TABLES, string, string>>()
+    private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []
 
     constructor(
         public readonly schema: SqlSchema<TABLES>
@@ -91,11 +93,20 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
 
     /**
      * Creates a table for a "from" clause, wrapping a table with an alias.
+     * 
+     * @param alias the local query name of the table; the same table can be included multiple times with different aliases
+     * @param tableName the schema name of the table to scan
+     * @param joinType the join style, or undefined if there's no join
+     * @param fJoin function that takes the new table as an argument, and returns the SQL expression for the join
      */
-    from<TABLENAME extends keyof TABLES, TALIAS extends string>(tableName: TABLENAME, alias: TALIAS) {
-        const t = new SqlFromTable(this.schema.schema.tables, tableName, alias)
-        this.fromTables.set(alias, t as any)
-        return t
+    from<TABLENAME extends keyof TABLES, TALIAS extends string>(alias: TALIAS, tableName: TABLENAME, joinType?: SqlJoinType, fJoin?: (t: SqlFromTable<TABLES, TABLENAME, TALIAS>) => SqlExpression<'BOOLEAN'>) {
+        const table = new SqlFromTable(this.schema.schema.tables, tableName, alias)
+        this.joins.push({
+            table,
+            joinType,
+            joiner: (joinType && fJoin) ? fJoin(table) : undefined,
+        })
+        return table
     }
 
     toSql(): string {
@@ -111,83 +122,18 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
         )
 
         // FROM
-        if (this.fromTables.size) {
-            const tableSql = Array.from(this.fromTables.values()).map(
-                t => `${t.tableName} ${t.alias}`
-            )
-            pieces.push('FROM ' + tableSql.join(', '))
+        if (this.joins.length > 0) {
+            const tableSql = this.joins.map(join => {
+                let sql = `${String(join.table.tableName)} ${join.table.alias}`
+                if (join.joinType && join.joiner) {
+                    sql = `${join.joinType} ${sql} ON ${join.joiner.toSql(true)}`
+                }
+                return sql
+            })
+            pieces.push('FROM ' + tableSql.join(' '))
         }
 
         // done
         return pieces.join('\n')
     }
 }
-
-/** A 'from' clause, with aliased tables and joins. */
-// export class SqlFrom<S extends SchemaDatabase> {
-//     private readonly froms: SqlFromTable<S, string, string>[] = []
-
-//     constructor(
-//         public readonly schema: S
-//     ) { }
-
-//     /**
-//      * Adds a table to the `FROM` clause, returning it.
-//      */
-//     table<TABLE extends string & keyof S['tables'], TALIAS extends string>(tableName: TABLE, alias: TALIAS): SqlFromTable<S, TABLE, TALIAS> {
-//         const table = new SqlFromTable(this.schema, tableName, alias)
-//         this.froms.push(table)
-//         return table
-//     }
-
-//     toSql() {
-//         return 'FROM ' + this.froms.map(from => `"${from.tableName}" ${from.alias}`).join(', ') + "\n"
-//     }
-// }
-
-/**
- * A 'SELECT' clause, with subclauses.
- */
-// export class SqlSelect<S extends SchemaDatabase> {
-//     private readonly selects = new Map<string, SqlExpression<any>>()
-//     public readonly from: SqlFrom<S>
-//     private readonly wheres: SqlExpression<'BOOLEAN'>[] = []
-
-//     constructor(
-//         public readonly schema: S,
-//     ) {
-//         this.from = new SqlFrom(schema)
-//     }
-
-//     /**
-//      * Add/replace one expression in the `SELECT` clause.
-//      */
-//     select(ex: SqlExpression<any>, alias: string) {
-//         this.selects.set(alias, ex)
-//     }
-
-//     /**
-//      * Sets multiple expressions in the `SELECT` clause at once, returning an object of the right types to receive the result.
-//      */
-//     selectResult<R extends Record<string, SqlExpression<any>>>(query: R): { [K in keyof R]: NativeFor<R[K]> } {
-//         for (const [alias, ex] of Object.entries(query)) {
-//             this.selects.set(alias, ex)
-//         }
-//         return {} as any
-//     }
-
-//     /**
-//      * Adds a boolean expression to the `WHERE` clause, connected with `AND`.
-//      */
-//     where(ex: SqlExpression<'BOOLEAN'>) {
-//         this.wheres.push(ex)
-//     }
-
-//     toSql() {
-//         const select = 'SELECT ' + Array.from(this.selects.entries()).map(([alias, ex]) => `${ex.toSql(true)} AS ${alias}`).join(',\n       ') + "\n"
-//         const where = this.wheres.length > 0 ? ('WHERE  ' + this.wheres.map(w => w.toSql(true)).join('\n   AND ') + "\n") : ""
-//         return select + this.from.toSql() + where
-//     }
-// }
-
-
