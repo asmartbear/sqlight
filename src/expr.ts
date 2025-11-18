@@ -1,4 +1,5 @@
-import { SqlType, NativeFor, SqlTypeFor } from './types'
+import { invariant } from './invariant';
+import { Nullish, SqlType, NativeFor, SqlTypeFor } from './types'
 
 /**
  * An input value to a SQL expression, either a supported native constant value or another
@@ -18,6 +19,15 @@ export type SqlExprFromNative<T> =
     T extends Buffer ? SqlLiteral<'BLOB', T> :
     T extends SqlExpression<infer U> ? T :
     never;
+
+/**
+ * An object that has a SQL type, but also an array or tuple of such objects, or Nullish.
+ */
+type SqlTypedGeneral<D extends SqlType> =
+    Nullish |
+    SqlExpression<D> |
+    SqlTypedGeneral<D>[] |
+    readonly SqlTypedGeneral<D>[];
 
 /** A BOOLEAN-typed literal */
 export function BOOL<T extends boolean>(x: T) {
@@ -61,16 +71,45 @@ export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer)
     throw new Error(`Unsupported literal type: ${typeof x}: [${x}]`)
 }
 
+/** Expression, or undefined */
+export function EXPR_UNDEF<D extends SqlType>(x: SqlInputValue<D> | undefined): SqlExpression<D> | undefined {
+    return x ? EXPR(x) : undefined
+}
+
 /**
  * Runs `EXPR` against a list of SQL expressions of the same type.
  */
-export function EXPRs<D extends SqlType>(list: SqlInputValue<D>[]): SqlExpression<D>[] {
+export function EXPRs<D extends SqlType>(list: readonly SqlInputValue<D>[]): readonly SqlExpression<D>[] {
     return list.map(EXPR) as any
 }
 
+/**
+ * Returns the SQL type from an expression or list of expressions, which also can be Nullish and such.
+ * 
+ * Returns `undefined` if there's nothing, or nothing in any list.
+ */
+export function TYPE<D extends SqlType>(...x: SqlTypedGeneral<D>[]): D | undefined {
+    if (!x || x.length == 0) return undefined
+    for (const s of x) {
+        if (!s) continue
+        if (s instanceof SqlExpression) return s.type
+        const t = TYPE<D>(...s)
+        if (t) return t
+    }
+    return undefined
+}
+
 /** Returns the first non-null expression in a list of expressions */
-export function COALESCE<D extends SqlType>(...list: SqlInputValue<D>[]): SqlExpression<D> {
+export function COALESCE<D extends SqlType>(...list: readonly SqlInputValue<D>[]): SqlExpression<D> {
     return new SqlCoalesce(EXPRs(list))
+}
+
+/**
+ * A series of `CASE WHEN ... THEN ... END` expressions as tuples, and optionally another expression for `ELSE`.
+ * If you don't have an expression for `ELSE`, it will return `NULL`.
+ */
+export function CASE<D extends SqlType>(whenList: readonly [SqlExpression<'BOOLEAN'>, SqlInputValue<D>][], elseExpr?: SqlInputValue<D>): SqlExpression<D> {
+    return new SqlCase<D>(whenList.map(pair => [pair[0], EXPR(pair[1])] as const), EXPR_UNDEF(elseExpr))
 }
 
 /**
@@ -113,7 +152,7 @@ export abstract class SqlExpression<D extends SqlType> {
     div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlBinaryOperator('REAL', '/', this, EXPR(rhs)) }
 
     /** Boolean of whether this value is in the given list of values */
-    inList(list: SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> { return new SqlInList(this, EXPRs(list)) }
+    inList(list: readonly SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> { return new SqlInList(this, EXPRs(list)) }
 }
 
 /**
@@ -174,7 +213,7 @@ class SqlBinaryArithmeticOperator<LHS extends 'INTEGER' | 'REAL', RHS extends 'I
 
 class SqlCoalesce<D extends SqlType> extends SqlExpression<D> {
     constructor(
-        private readonly list: SqlExpression<D>[],
+        private readonly list: readonly SqlExpression<D>[],
     ) {
         super(list[0].type)
     }
@@ -193,7 +232,7 @@ class SqlCoalesce<D extends SqlType> extends SqlExpression<D> {
 class SqlInList<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
     constructor(
         private readonly ex: SqlExpression<D>,
-        private readonly list: SqlExpression<D>[],
+        private readonly list: readonly SqlExpression<D>[],
     ) { super('BOOLEAN') }
 
     canBeNull(): boolean { return false }
@@ -202,5 +241,41 @@ class SqlInList<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
         let sql = `${this.ex.toSql(true)} IN (${this.list.map(e => e.toSql(true)).join(',')})`
         if (grouped) sql = '(' + sql + ')'
         return sql
+    }
+}
+
+class SqlCase<D extends SqlType> extends SqlExpression<D> {
+
+    private readonly allValues: SqlExpression<D>[]
+
+    constructor(
+        private readonly whenList: readonly [SqlExpression<'BOOLEAN'>, SqlExpression<D>][],
+        private readonly elseExpr?: SqlExpression<D>
+    ) {
+        const allValues = whenList.map(pair => pair[1])
+        if (elseExpr) {
+            allValues.push(elseExpr)
+        }
+        const type = TYPE(allValues)
+        invariant(type, "what?")
+        super(type)
+        this.allValues = allValues
+    }
+
+    canBeNull(): boolean {
+        if (!this.elseExpr) return true     // because lack of ELSE specifically returns NULL
+        return !this.allValues.every(s => !s.canBeNull())
+    }
+
+    toSql() {
+        let sql = this.whenList.map(
+            ([whenExpr, thenExpr]) => {
+                return `WHEN ${whenExpr.toSql(false)} THEN ${thenExpr.toSql(false)}`
+            }
+        ).join(' ')
+        if (this.elseExpr) {
+            sql += " ELSE " + this.elseExpr.toSql(false)
+        }
+        return `CASE ${sql} END`
     }
 }

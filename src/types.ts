@@ -1,4 +1,7 @@
 
+/** `null` or `undefined` */
+export type Nullish = null | undefined
+
 /** A data type that can be stored in a SQLite database. */
 export type SqlType = 'TEXT' | 'INTEGER' | 'REAL' | 'BOOLEAN' | 'BLOB'
 

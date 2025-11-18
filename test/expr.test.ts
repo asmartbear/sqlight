@@ -59,6 +59,19 @@ test('invalid literal', () => {
     T.throws(() => S.EXPR({ foo: 1 } as any))
 })
 
+test('TYPE', () => {
+    T.be(S.TYPE(S.EXPR(123)), "INTEGER")
+    T.be(S.TYPE(S.EXPR(12.3)), "REAL")
+    T.be(S.TYPE(S.EXPR("foo")), "TEXT")
+    T.be(S.TYPE(S.EXPR(false)), "BOOLEAN")
+    T.be(S.TYPE(), undefined)
+    T.be(S.TYPE(undefined, S.EXPR(123)), "INTEGER")
+    T.be(S.TYPE(S.EXPR(123), undefined), "INTEGER")
+    T.be(S.TYPE([undefined, undefined]), undefined)
+    T.be(S.TYPE([undefined, S.EXPR(123)]), "INTEGER")
+    T.be(S.TYPE([S.EXPR(123), undefined]), "INTEGER")
+})
+
 test('comparisons', () => {
     let s = S.EXPR("foo").eq("bar")
     T.be(s.type, "BOOLEAN")
@@ -188,5 +201,19 @@ test('coalesce', () => {
     T.be(s.type, "TEXT")
     T.be(s.toSql(false), "COALESCE('foo','bar')")
     T.be(s.toSql(true), "COALESCE('foo','bar')")
+    T.be(s.canBeNull(), false)
+})
+
+test('case', () => {
+    let s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]])
+    T.be(s.type, "INTEGER")
+    T.be(s.toSql(false), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 END")
+    T.be(s.toSql(true), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 END")
+    T.be(s.canBeNull(), true, "because there's no ELSE")
+
+    s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]], -1)
+    T.be(s.type, "INTEGER")
+    T.be(s.toSql(false), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 ELSE -1 END")
+    T.be(s.toSql(true), "CASE WHEN 'foo' = 'a' THEN 1 WHEN 'foo' = 'b' THEN 2 ELSE -1 END")
     T.be(s.canBeNull(), false)
 })
