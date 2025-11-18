@@ -1,0 +1,84 @@
+{
+  "name": "@asmartbear/sqlight",
+  "version": "1.0.1",
+  "description": "Typescript-safe SQL builder for SQLite",
+  "keywords": [
+    "sqlite"
+  ],
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "jest --runInBand",
+    "watch": "npm test -- --watchAll",
+    "watch-cov": "npm test -- --watchAll --coverage",
+    "coverage": "npm test -- --coverage",
+    "postcoverage": "open-cli coverage/lcov-report/index.html",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "build": "tsc",
+    "main": "tsc && node dist/index.js",
+    "minify": "uglifyjs --compress --mangle --output dist/index.min.js -- dist/index.js",
+    "postbuild": "npm run minify",
+    "prerelease": "npm test && npm run build",
+    "prepare": "npm test && npm run build",
+    "release": "standard-version",
+    "postpublish": "git push origin main --follow-tags"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.10.1",
+    "benchmark": "^2.1.4",
+    "jest": "^30.2.0",
+    "open-cli": "^8.0.0",
+    "rimraf": "^6.1.0",
+    "standard-version": "^9.5.0",
+    "ts-jest": "^29.4.5",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@asmartbear/simplified": "^1.0.8",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "license": "MIT",
+  "repository": {
+    "url": "git@github.com:asmartbear/sqlight.git",
+    "type": "git"
+  },
+  "bugs": {
+    "url": "https://github.com/asmartbear/sqlight/issues"
+  },
+  "author": {
+    "name": "Jason Cohen",
+    "url": "https://github.com/asmartbear"
+  },
+  "main": "dist/index.min.js",
+  "files": [
+    "dist"
+  ],
+  "types": "dist",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "cache": true,
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "test/.+\\.test\\.(ts|tsx|js)$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/",
+      "/test/"
+    ]
+  }
+}
