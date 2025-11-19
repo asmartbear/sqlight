@@ -264,6 +264,12 @@ export class BearSqlNote {
         this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, undefined, this.frontMatter), 'replace_all')
     }
 
+    /** Appends content to a note, in memory and in Bear.  No other changes will be saved! */
+    append(txt: string) {
+        this.body += txt
+        this.setRawContent(txt, 'append')
+    }
+
     /**
      * Computes complete Bear note content given inputs in pieces.
      * 
@@ -295,6 +301,7 @@ export class BearSqlNote {
             id: this.uniqueId,
             text: content,
             mode: mode,
+            show_window: "no",
         })
         this.row.ZTEXT = content
     }
@@ -511,9 +518,10 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
     invariant(note)
     const frontMatter: { baz: number } = note.frontMatter as any
-    note.h1 += '!'
-    frontMatter.baz += 1
-    note.save()
+    // note.h1 += '!'
+    // frontMatter.baz += 1
+    // note.save()
+    // note.append("\n" + randomUUID())
 
     // Create a note
     // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
