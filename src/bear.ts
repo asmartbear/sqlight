@@ -9,10 +9,18 @@ import { Nullish } from './types';
 import { parseYaml, toYamlString, YamlStruct } from './yaml';
 import invariant from 'tiny-invariant';
 
+const BEAR_EPOCH = 978307200
+
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
     // need to add the following offset to the timestamps to get a unix timestamp
-    return new Date((ts + 978307200) * 1000)
+    return new Date((ts + BEAR_EPOCH) * 1000)
+}
+
+function dateToBearTimestamp(d: Date): number {
+    // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
+    // need to add the following offset to the timestamps to get a unix timestamp
+    return ((d.getTime() + 1) / 1000.0) - BEAR_EPOCH
 }
 
 /**
@@ -299,6 +307,13 @@ export class BearSqlNote {
             show_window: "no",
         })
     }
+
+    /**
+     * Deep-link to the Note inside the Bear app
+     */
+    get deepLinkUrl(): string {
+        return `bear://x-callback-url/open-note?id=${this.uniqueId}`
+    }
 }
 
 /** Options for how to query notes in Bear. */
@@ -313,6 +328,8 @@ export type BearNoteQueryOptions = {
     tagsInclude?: string[]
     /** Only notes that do not contain any of these tags */
     tagsExclude?: string[]
+    /** Only notes with modification dates newer than this */
+    modifiedAfter?: Date
     /** How to order the returned notes. */
     orderBy?: 'newest' | 'oldest'
     /** Normally inactive notes are ignored, but you can include them. */
@@ -411,6 +428,9 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         if (options.titleExact) {
             q.where(notes.ZTITLE.eq(options.titleExact))
         }
+        if (options.modifiedAfter) {
+            q.where(notes.ZMODIFICATIONDATE.gt(dateToBearTimestamp(options.modifiedAfter)))
+        }
 
         // Apply tags
         if (isNonEmptyArray(options.tagsInclude)) {
@@ -467,12 +487,12 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // console.log(await db.getTables())
 
     // Notes
-    // const notes = await db.getNotes({
-    //     limit: 5,
-    //     orderBy: 'newest',
-    //     tagsInclude: ['book/idea'],
-    // })
-    // console.log(notes.map(x => x.toString()))
+    const notes = await db.getNotes({
+        limit: 50,
+        orderBy: 'newest',
+        modifiedAfter: new Date(2025, 10, 19),
+    })
+    console.log(notes.map(x => x.toString()))
 
     // Get structured information from a note
     let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
@@ -481,7 +501,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     console.log(note.toString())
     console.log(note.body)
     console.log(note.frontMatter)
-    note.openInBear(true)
 
     // Create a note
     // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
