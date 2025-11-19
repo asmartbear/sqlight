@@ -1,23 +1,34 @@
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
+import { Mutex } from 'async-mutex';
 
 import { invariant } from './invariant';
 import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
+import { SqlSchema, SqlSelect } from './schema'
 
 
-/** The live connection to a database. */
-export class SqlightDatabase {
+/** The live connection to a database.  Mutexes access, since Sqlite doesn't allow multi-threaded access. */
+export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     private _db: Database | null = null
+    private mutex: Mutex
 
     constructor(
+        /** Database schema */
+        public readonly schema: SqlSchema<TABLES>,
         /** Path to the database on disk */
-        public readonly path: string
+        public readonly path: string,
     ) {
+        this.mutex = new Mutex()
+    }
+
+    /** Gets a new SELECT-builder, which can then be executed against this database. */
+    select(): DatabaseSelect<TABLES> {
+        return new DatabaseSelect(this)
     }
 
     /** Gets the database object, opening connection to the database if necessary */
-    async db(): Promise<Database> {
+    private async db(): Promise<Database> {
         if (!this._db) {
             await this.open()
             return this._db!
@@ -26,7 +37,7 @@ export class SqlightDatabase {
     }
 
     /** Opens connection to the database, or does nothing if it's already open. */
-    async open(): Promise<this> {
+    private async open(): Promise<this> {
         if (!this._db) {
             this._db = await open({
                 filename: this.path,
@@ -37,25 +48,47 @@ export class SqlightDatabase {
     }
 
     /** Closes connection to the datbase, or does nothing if it's already closed. */
-    async close(): Promise<this> {
-        if (this._db) {
-            await this._db.close()
-            this._db = null
-        }
-        return this
+    close(): Promise<this> {
+        return this.mutex.runExclusive(async () => {
+            if (this._db) {
+                await this._db.close()
+                this._db = null
+            }
+            return this
+        })
     }
 
-    /** Gets the list of tables in the database, along with their raw SQL creation definition. */
+    /** Runs an arbitrary query inside the mutex, loading all rows into memory at once. */
+    queryAll<ROW extends Record<string, any>>(sql: string): Promise<ROW[]> {
+        return this.mutex.runExclusive(async () => {
+            const db = await this.db()
+            return db.all<ROW[]>(sql)
+        })
+    }
+
+    /** Runs an arbitrary query inside the mutex, returning the first row or `undefined` if no rows. */
+    queryOne<ROW extends Record<string, any>>(sql: string): Promise<ROW | undefined> {
+        return this.mutex.runExclusive(async () => {
+            const db = await this.db()
+            return db.get<ROW>(sql)
+        })
+    }
+
+    /** Gets the list of tables in the database, along with their raw SQL creation definitions. */
     async getTables(): Promise<{ name: string, sql: string }[]> {
-        const db = await this.db()
-        return db.all("SELECT name, sql FROM sqlite_master WHERE type='table' ORDER BY name")
+        return this.queryAll("SELECT name, sql FROM sqlite_master WHERE type='table' ORDER BY name")
     }
 }
 
-// (async () => {
-//     const BEARDB_SQLITE = `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`
-//     const db = new SqlightDatabase(BEARDB_SQLITE)
-//     const result = await db.getTables()
-//     await db.close()
-//     return result
-// })().then(console.log)
+/** Extension of `SqlSelect` that allows execution in the database */
+export class DatabaseSelect<TABLES extends Record<string, SchemaTable>> extends SqlSelect<TABLES> {
+
+    constructor(public readonly db: SqlightDatabase<TABLES>) {
+        super(db.schema)
+    }
+
+    /** Runs the query and returns all results. */
+    queryAll<ROW extends Record<string, any>>(): Promise<ROW[]> {
+        return this.db.queryAll(this.toSql())
+    }
+}

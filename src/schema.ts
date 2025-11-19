@@ -7,6 +7,9 @@ export function SCHEMA<TABLES extends Record<string, SchemaTable>>(schema: Schem
     return new SqlSchema(schema)
 }
 
+/** Extracts the TABLES type from an instantiated SqlSchema */
+export type TablesOf<S> = S extends SqlSchema<infer TABLES> ? TABLES : never
+
 /**
  * Holds functions that are global to an entire schema.
  */
@@ -75,7 +78,7 @@ type JoinedTable<TABLES extends Record<string, SchemaTable>, TABLENAME extends k
 }
 
 /** A SQL select expression. */
-class SqlSelect<TABLES extends Record<string, SchemaTable>> {
+export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
 
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
     private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []

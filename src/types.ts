@@ -43,7 +43,9 @@ export type RowColumn = {
 export type RowColumns = Record<string, RowColumn>;
 
 /** Converts a `RowColumns` object to one of native types, used to actually send or receive row data. */
-export type NativeForRowColumns<RC extends RowColumns> = { [K in keyof RC]: NativeFor<RC[K]['type']> };
+export type NativeForRowColumns<RC extends RowColumns> = {
+    [K in keyof RC]: NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+};
 
 /** Defines the schema of a column, with type and whether it can be `NULL`. */
 export type SchemaColumn = RowColumn & {
