@@ -80,6 +80,8 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
     private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []
     private readonly wheres: SqlExpression<'BOOLEAN'>[] = []
+    private limit: number = Number.MAX_SAFE_INTEGER
+    private offset: number = 0
 
     constructor(
         public readonly schema: SqlSchema<TABLES>
@@ -115,6 +117,18 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
         this.wheres.push(EXPR(sql))
     }
 
+    /** Limit the number of results to this. */
+    setLimit(n: number): this {
+        this.limit = n
+        return this
+    }
+
+    /** Start the result offset by this many rows. */
+    setOffset(n: number): this {
+        this.offset = n
+        return this
+    }
+
     toSql(): string {
         const clauses = Array.from(this.selectSql.entries())
         if (clauses.length == 0) return 'SELECT 1'        // corner case
@@ -142,6 +156,13 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
         // WHERE
         if (this.wheres.length > 0) {
             pieces.push('WHERE ' + AND(...this.wheres).toSql(false))
+        }
+
+        // LIMIT/OFFSET
+        const sqlLimit = this.limit < Number.MAX_SAFE_INTEGER ? `LIMIT ${this.limit}` : ''
+        const sqlOffset = this.offset > 0 ? ` OFFSET ${this.offset}` : ''
+        if (sqlLimit || sqlOffset) {
+            pieces.push(sqlLimit + sqlOffset)
         }
 
         // done

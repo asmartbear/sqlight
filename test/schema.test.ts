@@ -23,6 +23,16 @@ test('SELECT with no tables', () => {
     T.be(select.toSql(), `SELECT 'bar' AS foo`)
 })
 
+test('SELECT with limit and offset', () => {
+    const select = testSchema.select()
+    T.be(select.toSql(), "SELECT 1")
+    select.select('foo', 'bar')
+    select.setLimit(10)
+    T.be(select.toSql(), `SELECT 'bar' AS foo\nLIMIT 10`)
+    select.setOffset(5)
+    T.be(select.toSql(), `SELECT 'bar' AS foo\nLIMIT 10 OFFSET 5`)
+})
+
 test('SELECT with single FROM', () => {
     const select = testSchema.select()
     const u = select.from("u", "user")
