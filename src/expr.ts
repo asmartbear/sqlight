@@ -183,7 +183,7 @@ export abstract class SqlExpression<D extends SqlType> {
     div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlBinaryOperator('REAL', '/', [this, EXPR(rhs)]) }
 
     /** Boolean of whether this value is in the given list of values */
-    inList(list: readonly SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> { return new SqlInList(this, EXPRs(list)) }
+    inList<L extends SqlType>(list: readonly SqlInputValue<L>[]): SqlExpression<'BOOLEAN'> { return new SqlInList<D | L>(this, EXPRs(list)) }
 
     /** Boolean of whether this value is in a given subquery */
     inSubquery<L extends SqlType>(subq: SqlExpression<L>): SqlExpression<'BOOLEAN'> { return new SqlInSubquery<D | L>(this, subq) }

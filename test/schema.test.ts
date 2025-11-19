@@ -62,8 +62,9 @@ test('SELECT with single FROM', () => {
     T.be(apiKey.toSql(), "u.apiKey")
 
     select.select('myId', u.col.id)
+    select.passThrough(apiKey)
     select.select('super', CONCAT(u.col.login, "-taco"))
-    T.be(select.toSql(), `SELECT u.id AS myId, u.login||'-taco' AS super\nFROM user u`)
+    T.be(select.toSql(), `SELECT u.id AS myId, u.apiKey AS apiKey, u.login||'-taco' AS super\nFROM user u`)
 })
 
 test('SELECT with simple JOIN', () => {
@@ -81,7 +82,12 @@ test('WHERE x IN (subquery)', () => {
     const subselect = testSchema.select().select('id', EXPR(123))
     T.be(subselect.toSql(), "SELECT 123 AS id")
     const sub = subselect.asSubquery('id')
+    T.be(sub.canBeNull(), true)
     const select = testSchema.select().select('title', EXPR('hi'))
-    select.where(EXPR(456).inSubquery(sub))
+    const inSub = EXPR(456).inSubquery(sub)
+    T.be(inSub.canBeNull(), false)
+    T.be(inSub.toSql(false), "456 IN (SELECT 123 AS id)")
+    T.be(inSub.toSql(true), "(456 IN (SELECT 123 AS id))")
+    select.where(inSub)
     T.be(select.toSql(), `SELECT 'hi' AS title\nWHERE 456 IN (SELECT 123 AS id)`)
 })

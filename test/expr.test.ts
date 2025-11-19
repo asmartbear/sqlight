@@ -44,6 +44,13 @@ test('booleans', () => {
     T.be(S.EXPR(false).toSql(), "FALSE")
 })
 
+test('dates', () => {
+    const s = S.EXPR(new Date(1234567890123))
+    T.be(s.type, "TIMESTAMP")
+    T.be(s.toSql(), "2009-02-13T23:31:30.123Z")
+    T.be(s.canBeNull(), false)
+})
+
 test('blobs', () => {
     const s = S.EXPR(Buffer.from("hello", "utf8"))
     T.be(s.type, "BLOB")
