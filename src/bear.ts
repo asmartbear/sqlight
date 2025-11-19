@@ -268,20 +268,36 @@ export class BearSqlNote {
      * @param mode How to update the text.  `replace` means everything but the title; `replace_all` includes the title.
      * @param openNewNote If true, physically opens the note in the Bear app
      */
-    setContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all", open: boolean = false) {
+    setContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all") {
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-text
         bearXCall("add-text", {
             id: this.uniqueId,
             text: content,
             mode: mode,
-            show_window: open ? "yes" : "no",
-            edit: open ? "yes" : "no",
-            new_window: open ? "yes" : "no",
         })
         this.row.ZTEXT = content
-        if (open) {
-            openCmd('/Applications/Bear.app')
-        }
+    }
+
+    /** Opens this note in the Bear application */
+    openInBear(inNewWindow: boolean) {
+        // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#open-note
+        bearXCall("open-note", {
+            id: this.uniqueId,
+            show_window: "yes",
+            new_window: inNewWindow ? "yes" : "no",
+        })
+    }
+
+    /**
+     * Deletes this note inside the Bear app.
+     * Really moves it to the Trash, so it's still available, manually
+     */
+    deleteInBear() {
+        // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#trash
+        bearXCall("trash", {
+            id: this.uniqueId,
+            show_window: "no",
+        })
     }
 }
 
@@ -459,12 +475,13 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // console.log(notes.map(x => x.toString()))
 
     // Get structured information from a note
-    const note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
+    let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
     invariant(note)
     console.log(note.rawContent)
     console.log(note.toString())
     console.log(note.body)
     console.log(note.frontMatter)
+    note.openInBear(true)
 
     // Create a note
     // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
