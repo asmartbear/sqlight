@@ -53,21 +53,44 @@ const BearSchema = SCHEMA({
                 Z_13TAGS: { type: 'INTEGER' },
             }
         },
+        ZSFNOTEFILE: {
+            columns: {
+                Z_PK: { type: 'INTEGER', pk: true },
+                ZPERMANENTLYDELETED: { type: 'BOOLEAN' },
+                ZDOWNLOADED: { type: 'BOOLEAN' },
+                ZUPLOADED: { type: 'BOOLEAN' },
+                ZFILESIZE: { type: 'INTEGER' },
+                ZNOTE: { type: 'INTEGER' },
+                ZNORMALIZEDFILEEXTENSION: { type: 'VARCHAR' },
+                ZFILENAME: { type: 'VARCHAR' },
+                ZUNIQUEIDENTIFIER: { type: 'VARCHAR' },
+                ZCREATIONDATE: { type: 'TIMESTAMP' },
+                ZMODIFICATIONDATE: { type: 'TIMESTAMP' },
+                ZSEARCHTEXT: { type: 'VARCHAR' },
+            }
+        },
     }
 })
+
+/** Bear attachment on disk that is related to a Note */
+export class BearSqlAttachment {
+
+}
 
 /** Post-processed note from Bear */
 export class BearSqlNote {
     constructor(
+        public readonly database: BearSqlDatabase,
         private readonly row: {
             Z_PK: number,
             ZUNIQUEIDENTIFIER: string,
             ZTITLE: string,
             ZTEXT: string,
-            isActive: boolean,
             ZCONFLICTUNIQUEIDENTIFIER: string,
             ZCREATIONDATE: number,
             ZMODIFICATIONDATE: number,
+            isActive: boolean,
+            hasAttachments: boolean,
         }
     ) {
     }
@@ -112,8 +135,13 @@ export class BearSqlNote {
         return bearTimestampToDate(Math.max(this.row.ZCREATIONDATE, this.row.ZMODIFICATIONDATE))
     }
 
+    /** True if there are any kinds of file attachments on this note */
+    get hasAttachments(): boolean {
+        return this.row.hasAttachments
+    }
+
     toString(): string {
-        return `${this.pk}/${this.uniqueId}${this.isActive ? '' : '[inactive]'}${this.isInConflict ? '!!!' : ''}: ${this.title} on ${this.modifiedOn}`
+        return `${this.pk}/${this.uniqueId}${this.isActive ? '' : '[inactive]'}${this.isInConflict ? '!!!' : ''}${this.hasAttachments ? '+++' : ''}: ${this.title} on ${this.modifiedOn}`
     }
 }
 
@@ -133,6 +161,8 @@ export type BearNoteQueryOptions = {
     orderBy?: 'newest' | 'oldest'
     /** Normally inactive notes are ignored, but you can include them. */
     includeInactive?: boolean
+    /** Normally conflicted notes are ignored, but you can include them. */
+    includeInConflict?: boolean
 }
 
 /** Information about a tag in Bear, */
@@ -170,11 +200,16 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             .passThrough(notes.ZCONFLICTUNIQUEIDENTIFIER)
             .passThrough(notes.ZCREATIONDATE)
             .passThrough(notes.ZMODIFICATIONDATE)
+            .passThrough(notes.ZMODIFICATIONDATE)
             .select('isActive', isActive)
+            .select('hasAttachments', notes.ZHASFILES.or(notes.ZHASIMAGES))
 
         // Apply various filters
         if (!options.includeInactive) {
             q.where(isActive)
+        }
+        if (!options.includeInConflict) {
+            q.where(notes.ZCONFLICTUNIQUEIDENTIFIER.isNull())
         }
         if (options.uniqueId) {
             q.where(notes.ZUNIQUEIDENTIFIER.eq(options.uniqueId))
@@ -211,22 +246,27 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         q.setLimit(options.limit)
         console.log(q.toSql())
         const rows = await this.selectAll(q)
-        return rows.map(r => new BearSqlNote(r))
+        return rows.map(r => new BearSqlNote(this, r))
     }
 
+    /** 
+     * Extracts one note by its unique ID, or `undefined` if we can't find it. 
+     * 
+     * Unlike the default search, will include inactive and conflicted notes, since you were
+     * looking for a specific one.
+     */
     async getNoteByUniqueId(uniqueId: string): Promise<BearSqlNote | undefined> {
-        return (await this.getNotes({ limit: 1, uniqueId }))[0]
+        return (await this.getNotes({ limit: 1, uniqueId, includeInactive: true, includeInConflict: true }))[0]
     }
 }
 
 (async () => {
     const db = new BearSqlDatabase()
-    // const result = await db.getTables()
+    console.log(await db.getTables())
     const result = await db.getNotes({
         limit: 5,
         orderBy: 'newest',
-        tagsInclude: ['art/draft'],
-        tagsExclude: ['art/evergreen', 'art/article'],
+        tagsInclude: ['book/idea'],
     })
     await db.close()
     return result.map(x => x.toString())
