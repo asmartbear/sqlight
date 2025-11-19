@@ -211,11 +211,12 @@ test('concat', () => {
     T.be(s.canBeNull(), false)
 })
 
-test('and/or', () => {
+test('and/or (and multi-nary operators generally)', () => {
+    // Binary
     for (const op of [{
-        op: 'AND', f: (lhs: boolean, rhs: boolean) => S.AND(lhs, rhs),
+        op: 'AND', f: (lhs: boolean, rhs: boolean) => S.BOOL(lhs).and(rhs),
     }, {
-        op: 'OR', f: (lhs: boolean, rhs: boolean) => S.OR(lhs, rhs),
+        op: 'OR', f: (lhs: boolean, rhs: boolean) => S.BOOL(lhs).or(rhs),
     }]) {
         let s = op.f(true, false)
         T.be(s.type, "BOOLEAN")
@@ -223,6 +224,27 @@ test('and/or', () => {
         T.be(s.toSql(true), `(TRUE ${op.op} FALSE)`)
         T.be(s.canBeNull(), false)
     }
+
+    // Nested
+    let s = S.OR(S.AND(true, false), true, false)
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), `(TRUE AND FALSE) OR TRUE OR FALSE`)
+    T.be(s.toSql(true), `((TRUE AND FALSE) OR TRUE OR FALSE)`)
+    T.be(s.canBeNull(), false)
+
+    // Degenerate
+    s = S.AND(true)
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), `TRUE`)
+    T.be(s.toSql(true), `TRUE`)
+    T.be(s.canBeNull(), false)
+
+    // Degenerate nested
+    s = S.AND(S.OR(true, false))
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), `TRUE OR FALSE`)
+    T.be(s.toSql(true), `(TRUE OR FALSE)`)
+    T.be(s.canBeNull(), false)
 })
 
 test('case', () => {

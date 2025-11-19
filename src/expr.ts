@@ -161,6 +161,9 @@ export abstract class SqlExpression<D extends SqlType> {
     gt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '>', [this, EXPR(rhs)]) }
     ge(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlBinaryOperator('BOOLEAN', '>=', [this, EXPR(rhs)]) }
 
+    and(rhs: SqlInputValue<'BOOLEAN'>) { return AND(this, rhs) }
+    or(rhs: SqlInputValue<'BOOLEAN'>) { return OR(this, rhs) }
+
     add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs)) }
     sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs)) }
     mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('*', this as any, EXPR(rhs)) }
@@ -214,8 +217,10 @@ class SqlBinaryOperator<D extends SqlType> extends SqlExpression<D> {
     }
 
     toSql(grouped: boolean) {
-        let sql = this.list.map(e => e.toSql(true)).join(this.op)
-        if (grouped) sql = '(' + sql + ')'
+        const groupInner = grouped || this.list.length > 1
+        const groupOuter = grouped && this.list.length > 1
+        let sql = this.list.map(e => e.toSql(groupInner)).join(this.op)
+        if (groupOuter) sql = '(' + sql + ')'
         return sql
     }
 }

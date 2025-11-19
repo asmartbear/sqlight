@@ -1,6 +1,6 @@
 import { invariant } from './invariant';
 import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase } from './types'
-import { SqlExpression, SqlInputValue, EXPR } from './expr'
+import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
 export function SCHEMA<TABLES extends Record<string, SchemaTable>>(schema: SchemaDatabase<TABLES>): SqlSchema<TABLES> {
@@ -79,6 +79,7 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
 
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
     private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []
+    private readonly wheres: SqlExpression<'BOOLEAN'>[] = []
 
     constructor(
         public readonly schema: SqlSchema<TABLES>
@@ -109,6 +110,11 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
         return table
     }
 
+    /** Adds a WHERE clause with AND */
+    where(sql: SqlInputValue<'BOOLEAN'>) {
+        this.wheres.push(EXPR(sql))
+    }
+
     toSql(): string {
         const clauses = Array.from(this.selectSql.entries())
         if (clauses.length == 0) return 'SELECT 1'        // corner case
@@ -131,6 +137,11 @@ class SqlSelect<TABLES extends Record<string, SchemaTable>> {
                 return sql
             })
             pieces.push('FROM ' + tableSql.join(' '))
+        }
+
+        // WHERE
+        if (this.wheres.length > 0) {
+            pieces.push('WHERE ' + AND(...this.wheres).toSql(false))
         }
 
         // done
