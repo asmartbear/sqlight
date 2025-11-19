@@ -1,3 +1,4 @@
+import { Nullish } from "./types"
 
 function _byteToUriChars(b: number): string {
     // Already fine
@@ -28,10 +29,18 @@ export function betterEncodeUriComponent(s: string): string {
  * Will not yield at all if the condition is already true.
  * Function can be promise-based or not
  */
-export async function busyWait<T>(msBetween: number, fIsReady: () => T | false | null | undefined | Promise<T | false | null | undefined>): Promise<T> {
+export async function busyWait<T>(msBetween: number, fIsReady: () => T | false | Nullish | Promise<T | false | Nullish>): Promise<T> {
     while (true) {
         const x = await fIsReady()
         if (x) return x
         await new Promise(resolve => setTimeout(resolve, msBetween))
     }
+}
+
+export function isNonEmptyArray<T>(x: T[] | Nullish): x is T[] {
+    return Array.isArray(x) && x.length > 0
+}
+
+export function objectLength(x: any): number {
+    return x ? Object.keys(x).length : 0
 }

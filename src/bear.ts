@@ -4,7 +4,9 @@ import { randomUUID } from 'crypto';
 import { SCHEMA, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
-import { betterEncodeUriComponent, busyWait } from './util'
+import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength } from './util'
+import { Nullish } from './types';
+import { toYamlString, YamlStruct } from './yaml';
 
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
@@ -224,9 +226,27 @@ export class BearSqlNote {
     }
 
     /**
+     * Computes complete Bear note content given inputs in pieces.
+     * 
+     * Implemented as a public static method for unit-testing.
+     * 
+     * @param title The (optional) title for the note
+     * @param body The (optional) markdown-formatted body of the note
+     * @param tags The (optional) list of tags to apply to the note
+     * @param meta The (optional) YAML-compatible meta-data to add to the top of the note
+     */
+    static createStructuredContent(title: string | Nullish, body: string | Nullish, tags: string[] | Nullish = undefined, meta: YamlStruct | Nullish = undefined): string {
+        const tagContent = isNonEmptyArray(tags) ? "\n" + tags.map(tag => '#' + tag + "\n").join('') : ""
+        const metaContent = (meta && objectLength(meta) > 0) ? "---\n" + toYamlString(meta) + "---\n\n" : ""
+        const titleContent = title ? `# ${title.trim()}\n\n` : ""
+        const bodyContent = body ? body.trimEnd() + "\n" : ""
+        return metaContent + titleContent + bodyContent + tagContent
+    }
+
+    /**
      * Updates the text of this note.  Happens in the background; you can't tell exactly when it will complete, but usually within a few seconds.  The local in-memory object updates immediately.
      * 
-     * @param content to append, prepend, or replace; if full replacement, you might want to use `BearNote.createBearNoteContent()` to produce it.
+     * @param content to append, prepend, or replace; if full replacement, you might want to use `BearSqlNote.createStructuredContent()` to produce it.
      * @param mode How to update the text.  `replace` means everything but the title; `replace_all` includes the title.
      * @param openNewNote If true, physically opens the note in the Bear app
      */
@@ -287,7 +307,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     /**
      * Creates a new generic Bear note.
      * 
-     * @param content The raw content of the note; recommmend using `BearNote.createBearNoteContent()` to produce this.
+     * @param content The raw content of the note; recommmend using `BearSqlNote.createStructuredContent()` to produce this.
      * @param openNewNote If true, physically opens the note in the Bear app
      */
     static createNote(content: string, openNewNote: boolean) {
@@ -359,7 +379,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         }
 
         // Apply tags
-        if (options.tagsInclude && options.tagsInclude.length > 0) {
+        if (isNonEmptyArray(options.tagsInclude)) {
             const start = this.select()
             const tags = start.from('t', 'ZSFNOTETAG').col
             const mapping = start.from('m', 'Z_5TAGS', 'JOIN', m => m.col.Z_13TAGS.eq(tags.Z_PK)).col
@@ -367,7 +387,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             sub.where(tags.ZTITLE.inList(options.tagsInclude))
             q.where(notes.Z_PK.inSubquery(sub.asSubquery('Z_5NOTES')))
         }
-        if (options.tagsExclude && options.tagsExclude.length > 0) {
+        if (isNonEmptyArray(options.tagsExclude)) {
             const start = this.select()
             const tags = start.from('t', 'ZSFNOTETAG').col
             const mapping = start.from('m', 'Z_5TAGS', 'JOIN', m => m.col.Z_13TAGS.eq(tags.Z_PK)).col
@@ -422,8 +442,13 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     console.log(notes.map(x => x.toString()))
 
     // Create a note
-    const newNote = await db.createAndReturnNote("this isn't a new creation... again")
-    console.log(newNote.toString())
+    // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
+    //     "This is better",
+    //     "This is the content I always wished I could have.",
+    //     ['home'],
+    //     { foo: "bar", baz: 321 }
+    // ))
+    // console.log(newNote.toString())
 
     return "done"
 })().then(console.log)
