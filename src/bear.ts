@@ -6,7 +6,8 @@ import { SqlightDatabase } from './db'
 import { OR } from './expr'
 import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength } from './util'
 import { Nullish } from './types';
-import { toYamlString, YamlStruct } from './yaml';
+import { parseYaml, toYamlString, YamlStruct } from './yaml';
+import invariant from 'tiny-invariant';
 
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
@@ -142,6 +143,13 @@ export class BearSqlAttachment {
 
 /** Post-processed note from Bear */
 export class BearSqlNote {
+
+    /** The body-content of the note, excluding YAML header, H1, and tags. */
+    public readonly body: string
+
+    /** The YAML header of the note, which might be an empty structure if it's missing. */
+    public readonly frontMatter: YamlStruct
+
     constructor(
         public readonly database: BearSqlDatabase,
         private readonly row: {
@@ -156,6 +164,16 @@ export class BearSqlNote {
             hasAttachments: boolean,
         }
     ) {
+        // Parse out the front matter
+        const ym = parseYaml(row.ZTEXT)
+        this.body = ym.text.trim()
+        this.frontMatter = ym.data
+
+        // Remove the H1 if it's there
+        this.body = this.body.replace(/^#\s+[^\n]*\n/m, '').trimStart()
+
+        // Remove tags if they're there
+        this.body = this.body.replaceAll(/^#[\w\/-]+(?:\n|$)/mg, '').trim()
     }
 
     /** The database-unique primary key of this note */
@@ -170,12 +188,12 @@ export class BearSqlNote {
 
     /** The title of the note as extracted into the database, not looking directly at the H1. */
     get title(): string {
-        return this.row.ZTITLE.trim()
+        return this.row.ZTITLE
     }
 
-    /** The content of the note including the H1 that might replicate the title and including tags. */
-    get content(): string {
-        return this.row.ZTEXT.trim()
+    /** The raw, unprocessed content of the note, including the H1 that might replicate the title and including tags. */
+    get rawContent(): string {
+        return this.row.ZTEXT
     }
 
     /** True if this note hasn't been archived or deleted. */
@@ -433,13 +451,20 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // console.log(await db.getTables())
 
     // Notes
-    const notes = await db.getNotes({
-        limit: 5,
-        orderBy: 'newest',
-        tagsInclude: ['book/idea'],
-    })
-    await db.close()
-    console.log(notes.map(x => x.toString()))
+    // const notes = await db.getNotes({
+    //     limit: 5,
+    //     orderBy: 'newest',
+    //     tagsInclude: ['book/idea'],
+    // })
+    // console.log(notes.map(x => x.toString()))
+
+    // Get structured information from a note
+    const note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
+    invariant(note)
+    console.log(note.rawContent)
+    console.log(note.toString())
+    console.log(note.body)
+    console.log(note.frontMatter)
 
     // Create a note
     // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
@@ -450,5 +475,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // ))
     // console.log(newNote.toString())
 
+    await db.close()
     return "done"
 })().then(console.log)
