@@ -125,6 +125,10 @@ export type BearNoteQueryOptions = {
     uniqueId?: string
     /** Only notes where the title exactly equals this */
     titleExact?: string
+    /** Only notes that contain at least one of these tags */
+    tagsInclude?: string[]
+    /** Only notes that do not contain any of these tags */
+    tagsExclude?: string[]
     /** How to order the returned notes. */
     orderBy?: 'newest' | 'oldest'
     /** Normally inactive notes are ignored, but you can include them. */
@@ -143,6 +147,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         super(BearSchema, `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`)
     }
 
+    /** Retrieves all tags in the system */
     getTags(): Promise<BearTag[]> {
         const shell = this.select()
         const tags = shell.from('t', 'ZSFNOTETAG')
@@ -155,16 +160,16 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     /** Queries for notes in Bear, returning structured objects with additional abilities. */
     async getNotes(options: BearNoteQueryOptions) {
         const shell = this.select()
-        const notes = shell.from('n', 'ZSFNOTE')
-        const isActive = OR(notes.col.ZARCHIVED, notes.col.ZTRASHED, notes.col.ZPERMANENTLYDELETED).not()
+        const notes = shell.from('n', 'ZSFNOTE').col
+        const isActive = OR(notes.ZARCHIVED, notes.ZTRASHED, notes.ZPERMANENTLYDELETED).not()
         const q = shell
-            .passThrough(notes.col.Z_PK)
-            .passThrough(notes.col.ZUNIQUEIDENTIFIER)
-            .passThrough(notes.col.ZTITLE)
-            .passThrough(notes.col.ZTEXT)
-            .passThrough(notes.col.ZCONFLICTUNIQUEIDENTIFIER)
-            .passThrough(notes.col.ZCREATIONDATE)
-            .passThrough(notes.col.ZMODIFICATIONDATE)
+            .passThrough(notes.Z_PK)
+            .passThrough(notes.ZUNIQUEIDENTIFIER)
+            .passThrough(notes.ZTITLE)
+            .passThrough(notes.ZTEXT)
+            .passThrough(notes.ZCONFLICTUNIQUEIDENTIFIER)
+            .passThrough(notes.ZCREATIONDATE)
+            .passThrough(notes.ZMODIFICATIONDATE)
             .select('isActive', isActive)
 
         // Apply various filters
@@ -172,22 +177,40 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             q.where(isActive)
         }
         if (options.uniqueId) {
-            q.where(notes.col.ZUNIQUEIDENTIFIER.eq(options.uniqueId))
+            q.where(notes.ZUNIQUEIDENTIFIER.eq(options.uniqueId))
         }
         if (options.titleExact) {
-            q.where(notes.col.ZTITLE.eq(options.titleExact))
+            q.where(notes.ZTITLE.eq(options.titleExact))
+        }
+
+        // Apply tags
+        if (options.tagsInclude && options.tagsInclude.length > 0) {
+            const start = this.select()
+            const tags = start.from('t', 'ZSFNOTETAG').col
+            const mapping = start.from('m', 'Z_5TAGS', 'JOIN', m => m.col.Z_13TAGS.eq(tags.Z_PK)).col
+            const sub = start.passThrough(mapping.Z_5NOTES)
+            sub.where(tags.ZTITLE.inList(options.tagsInclude))
+            q.where(notes.Z_PK.inSubquery(sub.asSubquery('Z_5NOTES')))
+        }
+        if (options.tagsExclude && options.tagsExclude.length > 0) {
+            const start = this.select()
+            const tags = start.from('t', 'ZSFNOTETAG').col
+            const mapping = start.from('m', 'Z_5TAGS', 'JOIN', m => m.col.Z_13TAGS.eq(tags.Z_PK)).col
+            const sub = start.passThrough(mapping.Z_5NOTES)
+            sub.where(tags.ZTITLE.inList(options.tagsExclude))
+            q.where(notes.Z_PK.inSubquery(sub.asSubquery('Z_5NOTES')).not())
         }
 
         // Apply ordering
         switch (options.orderBy) {
-            case 'newest': q.orderBy(notes.col.ZMODIFICATIONDATE, 'DESC'); break
-            case 'oldest': q.orderBy(notes.col.ZMODIFICATIONDATE, 'ASC'); break
+            case 'newest': q.orderBy(notes.ZMODIFICATIONDATE, 'DESC'); break
+            case 'oldest': q.orderBy(notes.ZMODIFICATIONDATE, 'ASC'); break
         }
 
         // Run the query
         q.setLimit(options.limit)
-        const rows = await this.selectAll(q)
         console.log(q.toSql())
+        const rows = await this.selectAll(q)
         return rows.map(r => new BearSqlNote(r))
     }
 
@@ -198,11 +221,13 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 
 (async () => {
     const db = new BearSqlDatabase()
-    // const result = await db.getNotes({
-    //     limit: 5,
-    //     orderBy: 'newest',
-    // })
-    const result = await db.getTables()
+    // const result = await db.getTables()
+    const result = await db.getNotes({
+        limit: 5,
+        orderBy: 'newest',
+        tagsInclude: ['art/draft'],
+        tagsExclude: ['art/evergreen', 'art/article'],
+    })
     await db.close()
-    return result//.map(x => x.toString())
+    return result.map(x => x.toString())
 })().then(console.log)
