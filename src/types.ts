@@ -2,6 +2,9 @@
 /** `null` or `undefined` */
 export type Nullish = null | undefined
 
+/** Flatten `{} & {} & ... & {}` into a single structure. */
+export type Flatten<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
+
 /** A data type that can be stored in a SQLite database. */
 export type SqlType = 'TEXT' | 'VARCHAR' | 'INTEGER' | 'REAL' | 'BOOLEAN' | 'TIMESTAMP' | 'BLOB'
 

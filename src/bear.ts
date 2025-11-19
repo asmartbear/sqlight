@@ -103,13 +103,14 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 
     async getNotes() {
 
-        let q = this.select()
-        const notes = q.from('n', 'ZSFNOTE')
-        q = q.passThrough(notes.col.Z_PK)
-        q = q.passThrough(notes.col.ZUNIQUEIDENTIFIER)
-        q = q.passThrough(notes.col.ZTITLE)
-        q = q.setLimit(10).orderBy(notes.col.Z_PK, 'DESC')
-        const rows = await this.queryAll(q.toSql())
+        const shell = this.select()
+        const notes = shell.from('n', 'ZSFNOTE')
+        const q = shell
+            .passThrough(notes.col.Z_PK)
+            .passThrough(notes.col.ZUNIQUEIDENTIFIER)
+            .passThrough(notes.col.ZTITLE)
+        q.setLimit(5).orderBy(notes.col.ZMODIFICATIONDATE, 'DESC')
+        const rows = await this.selectAll(q)
         return rows
         // return rows.map(r => new BearSqlNote(r))
     }

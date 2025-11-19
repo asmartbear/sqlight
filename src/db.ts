@@ -3,9 +3,9 @@ import { open, Database } from 'sqlite';
 import { Mutex } from 'async-mutex';
 
 import { invariant } from './invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase } from './types'
+import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
-import { SqlSchema, SqlSelect } from './schema'
+import { SqlSchema, SqlSelect, NativeSelectRow } from './schema'
 
 
 /** The live connection to a database.  Mutexes access, since Sqlite doesn't allow multi-threaded access. */
@@ -23,8 +23,8 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     }
 
     /** Gets a new SELECT-builder, which can then be executed against this database. */
-    select(): DatabaseSelect<TABLES> {
-        return new DatabaseSelect(this)
+    select() {
+        return this.schema.select()
     }
 
     /** Gets the database object, opening connection to the database if necessary */
@@ -62,7 +62,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     queryAll<ROW extends Record<string, any>>(sql: string): Promise<ROW[]> {
         return this.mutex.runExclusive(async () => {
             const db = await this.db()
-            return db.all<ROW[]>(sql)
+            return db.all(sql)
         })
     }
 
@@ -74,21 +74,18 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         })
     }
 
+    /** Runs a query inside the mutex, loading all rows into memory at once. */
+    selectAll<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<typeof select>[]> {
+        return this.queryAll(select.toSql())
+    }
+
+    /** Runs a query inside the mutex, returning the first row or `undefined` if no rows. */
+    selectOne<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<typeof select> | undefined> {
+        return this.queryOne(select.toSql())
+    }
+
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */
     async getTables(): Promise<{ name: string, sql: string }[]> {
         return this.queryAll("SELECT name, sql FROM sqlite_master WHERE type='table' ORDER BY name")
-    }
-}
-
-/** Extension of `SqlSelect` that allows execution in the database */
-export class DatabaseSelect<TABLES extends Record<string, SchemaTable>> extends SqlSelect<TABLES> {
-
-    constructor(public readonly db: SqlightDatabase<TABLES>) {
-        super(db.schema)
-    }
-
-    /** Runs the query and returns all results. */
-    queryAll<ROW extends Record<string, any>>(): Promise<ROW[]> {
-        return this.db.queryAll(this.toSql())
     }
 }

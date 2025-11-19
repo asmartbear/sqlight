@@ -1,5 +1,5 @@
 import { invariant } from './invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase } from './types'
+import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
@@ -83,8 +83,11 @@ type OrderBy = {
     ascending: 'ASC' | 'DESC',
 }
 
+/** Extracts the native row type for a select statement. */
+export type NativeSelectRow<S> = S extends SqlSelect<any, infer NATIVEROW> ? Flatten<NATIVEROW> : never;
+
 /** A SQL select expression. */
-export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
+export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW extends Record<string, any> = {}> {
 
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
     private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []
@@ -100,14 +103,14 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
     }
 
     /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
-    select(alias: string, sql: SqlInputValue<SqlType>): this {
+    select<TALIAS extends string, D extends SqlType>(alias: TALIAS, sql: SqlInputValue<D>) {
         this.selectSql.set(alias, EXPR(sql))
-        return this
+        return this as SqlSelect<TABLES, NATIVEROW & { [K in TALIAS]: NativeFor<D> }>
     }
 
     /** Same as `select()` when we want to pass through a table column unchanged. */
-    passThrough<COLNAME extends string, COLUMN extends SchemaColumn>(col: SqlColumn<COLNAME, COLUMN>): this {
-        return this.select(col.columnName, col)
+    passThrough<COLNAME extends string, COLUMN extends SchemaColumn>(col: SqlColumn<COLNAME, COLUMN>) {
+        return this.select<COLNAME, COLUMN["type"]>(col.columnName, col)
     }
 
     /**
