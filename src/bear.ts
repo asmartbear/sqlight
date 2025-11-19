@@ -101,9 +101,17 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         super(BearSchema, `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`)
     }
 
-    async getNotes(): Promise<BearSqlNote[]> {
-        const rows = await this.queryAll("SELECT * FROM ZSFNOTE WHERE ZUNIQUEIDENTIFIER='0577592B-D044-400F-B323-4B475F7B574C' LIMIT 1")
-        return rows.map(r => new BearSqlNote(r))
+    async getNotes() {
+
+        let q = this.select()
+        const notes = q.from('n', 'ZSFNOTE')
+        q = q.passThrough(notes.col.Z_PK)
+        q = q.passThrough(notes.col.ZUNIQUEIDENTIFIER)
+        q = q.passThrough(notes.col.ZTITLE)
+        q = q.setLimit(10).orderBy(notes.col.Z_PK, 'DESC')
+        const rows = await this.queryAll(q.toSql())
+        return rows
+        // return rows.map(r => new BearSqlNote(r))
     }
 }
 
@@ -111,5 +119,5 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     const db = new BearSqlDatabase()
     const result = await db.getNotes()
     await db.close()
-    return result.map(n => n.toString())
+    return result
 })().then(console.log)

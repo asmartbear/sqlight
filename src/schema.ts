@@ -77,12 +77,19 @@ type JoinedTable<TABLES extends Record<string, SchemaTable>, TABLENAME extends k
     joiner?: SqlExpression<'BOOLEAN'>,
 }
 
+/** Internal type to store an ordering element */
+type OrderBy = {
+    value: SqlExpression<SqlType>,
+    ascending: 'ASC' | 'DESC',
+}
+
 /** A SQL select expression. */
 export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
 
     private readonly selectSql = new Map<string, SqlExpression<SqlType>>()
     private readonly joins: JoinedTable<TABLES, keyof TABLES, string>[] = []
     private readonly wheres: SqlExpression<'BOOLEAN'>[] = []
+    private readonly orderBys: OrderBy[] = []
     private limit: number = Number.MAX_SAFE_INTEGER
     private offset: number = 0
 
@@ -93,8 +100,14 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
     }
 
     /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
-    select(alias: string, sql: SqlInputValue<SqlType>) {
+    select(alias: string, sql: SqlInputValue<SqlType>): this {
         this.selectSql.set(alias, EXPR(sql))
+        return this
+    }
+
+    /** Same as `select()` when we want to pass through a table column unchanged. */
+    passThrough<COLNAME extends string, COLUMN extends SchemaColumn>(col: SqlColumn<COLNAME, COLUMN>): this {
+        return this.select(col.columnName, col)
     }
 
     /**
@@ -116,8 +129,9 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
     }
 
     /** Adds a WHERE clause with AND */
-    where(sql: SqlInputValue<'BOOLEAN'>) {
+    where(sql: SqlInputValue<'BOOLEAN'>): this {
         this.wheres.push(EXPR(sql))
+        return this
     }
 
     /** Limit the number of results to this. */
@@ -129,6 +143,12 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
     /** Start the result offset by this many rows. */
     setOffset(n: number): this {
         this.offset = n
+        return this
+    }
+
+    /** Appends another ORDER BY clause, breaking ties from the previous clauses */
+    orderBy(sql: SqlInputValue<SqlType>, ascending: 'ASC' | 'DESC'): this {
+        this.orderBys.push({ value: EXPR(sql), ascending })
         return this
     }
 
@@ -159,6 +179,13 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>> {
         // WHERE
         if (this.wheres.length > 0) {
             pieces.push('WHERE ' + AND(...this.wheres).toSql(false))
+        }
+
+        // ORDER BY
+        if (this.orderBys.length > 0) {
+            pieces.push('ORDER BY ' + this.orderBys.map(clause =>
+                `${clause.value.toSql(false)} ${clause.ascending}`
+            ).join(', '))
         }
 
         // LIMIT/OFFSET

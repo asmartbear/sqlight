@@ -33,6 +33,18 @@ test('SELECT with limit and offset', () => {
     T.be(select.toSql(), `SELECT 'bar' AS foo\nLIMIT 10 OFFSET 5`)
 })
 
+test('SELECT with order by', () => {
+    const select = testSchema.select()
+    select.select('foo', 'bar')
+    T.be(select.toSql(), `SELECT 'bar' AS foo`)
+    select.orderBy('foo', 'ASC')
+    T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC`)
+    select.orderBy('bar', 'DESC')
+    T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC, 'bar' DESC`)
+    select.setLimit(10)
+    T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC, 'bar' DESC\nLIMIT 10`, "limit in the right order")
+})
+
 test('SELECT with single FROM', () => {
     const select = testSchema.select()
     const u = select.from("u", "user")
