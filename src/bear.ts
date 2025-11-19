@@ -39,7 +39,20 @@ const BearSchema = SCHEMA({
                 ZTEXT: { type: 'VARCHAR' },
                 ZTITLE: { type: 'VARCHAR' },
             }
-        }
+        },
+        ZSFNOTETAG: {
+            columns: {
+                Z_PK: { type: 'INTEGER', pk: true },
+                ZISROOT: { type: 'BOOLEAN' },
+                ZTITLE: { type: 'VARCHAR' },
+            }
+        },
+        Z_5TAGS: {
+            columns: {
+                Z_5NOTES: { type: 'INTEGER' },
+                Z_13TAGS: { type: 'INTEGER' },
+            }
+        },
     }
 })
 
@@ -104,10 +117,8 @@ export class BearSqlNote {
     }
 }
 
-/**
- * Options for how to query notes in Bear.
- */
-export type NoteQueryOptions = {
+/** Options for how to query notes in Bear. */
+export type BearNoteQueryOptions = {
     /** Maximum number of notes to return */
     limit: number
     /** Limit to the note with this unique identifier */
@@ -120,13 +131,29 @@ export type NoteQueryOptions = {
     includeInactive?: boolean
 }
 
+/** Information about a tag in Bear, */
+export type BearTag = {
+    id: number,
+    name: string,
+}
+
 /** A Sqlite database, specifically for Bear, allowing arbitrary queries but also some useful built-ins. */
 export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>> {
     constructor() {
         super(BearSchema, `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`)
     }
 
-    async getNotes(options: NoteQueryOptions) {
+    getTags(): Promise<BearTag[]> {
+        const shell = this.select()
+        const tags = shell.from('t', 'ZSFNOTETAG')
+        const q = shell
+            .select('id', tags.col.Z_PK)
+            .select('name', tags.col.ZTITLE)
+        return this.selectAll(q)
+    }
+
+    /** Queries for notes in Bear, returning structured objects with additional abilities. */
+    async getNotes(options: BearNoteQueryOptions) {
         const shell = this.select()
         const notes = shell.from('n', 'ZSFNOTE')
         const isActive = OR(notes.col.ZARCHIVED, notes.col.ZTRASHED, notes.col.ZPERMANENTLYDELETED).not()
@@ -171,11 +198,11 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 
 (async () => {
     const db = new BearSqlDatabase()
-    const result = await db.getNotes({
-        limit: 5,
-        orderBy: 'newest',
-    })
-    // const result = await db.getNoteByUniqueId('2252DCEB-5826-4079-893B-C94825EC31EC')
+    // const result = await db.getNotes({
+    //     limit: 5,
+    //     orderBy: 'newest',
+    // })
+    const result = await db.getTables()
     await db.close()
-    return result.map(x => x.toString())
+    return result//.map(x => x.toString())
 })().then(console.log)

@@ -1,5 +1,5 @@
 import { invariant } from './invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten } from './types'
+import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
@@ -102,6 +102,13 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
 
     }
 
+    /** Returns a SQL expression that is the result of running this query, selecting just the column in question */
+    asSubquery<TALIAS extends string>(alias: TALIAS): SqlExpression<SqlTypeFor<NATIVEROW[TALIAS]>> {
+        const expr = this.selectSql.get(alias)
+        invariant(expr)
+        return new SqlSubquery(expr.type, '(' + this.toSql() + ')') as any
+    }
+
     /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
     select<TALIAS extends string, D extends SqlType>(alias: TALIAS, sql: SqlInputValue<D>) {
         this.selectSql.set(alias, EXPR(sql))
@@ -201,4 +208,13 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
         // done
         return pieces.join('\n')
     }
+}
+
+class SqlSubquery<D extends SqlType> extends SqlExpression<D> {
+    constructor(
+        type: D,
+        private readonly sql: string,
+    ) { super(type) }
+    canBeNull(): boolean { return true }
+    toSql() { return this.sql }
 }

@@ -184,6 +184,9 @@ export abstract class SqlExpression<D extends SqlType> {
 
     /** Boolean of whether this value is in the given list of values */
     inList(list: readonly SqlInputValue<D>[]): SqlExpression<'BOOLEAN'> { return new SqlInList(this, EXPRs(list)) }
+
+    /** Boolean of whether this value is in a given subquery */
+    inSubquery<L extends SqlType>(subq: SqlExpression<L>): SqlExpression<'BOOLEAN'> { return new SqlInSubquery<D | L>(this, subq) }
 }
 
 /**
@@ -306,6 +309,21 @@ class SqlInList<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
 
     toSql(grouped: boolean) {
         let sql = `${this.ex.toSql(true)} IN (${this.list.map(e => e.toSql(true)).join(',')})`
+        if (grouped) sql = '(' + sql + ')'
+        return sql
+    }
+}
+
+class SqlInSubquery<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
+    constructor(
+        private readonly ex: SqlExpression<D>,
+        private readonly subquery: SqlExpression<D>,
+    ) { super('BOOLEAN') }
+
+    canBeNull(): boolean { return false }
+
+    toSql(grouped: boolean) {
+        let sql = `${this.ex.toSql(true)} IN ${this.subquery.toSql(true)}`
         if (grouped) sql = '(' + sql + ')'
         return sql
     }

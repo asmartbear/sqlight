@@ -76,3 +76,12 @@ test('SELECT with simple JOIN', () => {
     select.where(u1.col.id.ne(u2.col.id))
     T.be(select.toSql(), `SELECT u2.login AS dup_login\nFROM user u1 JOIN user u2 ON (u2.login=u1.login)\nWHERE u1.id!=u2.id`)
 })
+
+test('WHERE x IN (subquery)', () => {
+    const subselect = testSchema.select().select('id', EXPR(123))
+    T.be(subselect.toSql(), "SELECT 123 AS id")
+    const sub = subselect.asSubquery('id')
+    const select = testSchema.select().select('title', EXPR('hi'))
+    select.where(EXPR(456).inSubquery(sub))
+    T.be(select.toSql(), `SELECT 'hi' AS title\nWHERE 456 IN (SELECT 123 AS id)`)
+})
