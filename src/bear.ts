@@ -33,7 +33,6 @@ function bearXCall(cmd: string, args?: Record<string, string>) {
         urlArgs = '?' + argList.map(pair => `${betterEncodeUriComponent(pair[0])}=${betterEncodeUriComponent(pair[1])}`).join('&')
     }
     const url = `bear://x-callback-url/${cmd}${urlArgs}`
-    console.log(url)
     exec(`open '${url}'`)
 }
 
@@ -153,10 +152,13 @@ export class BearSqlAttachment {
 export class BearSqlNote {
 
     /** The body-content of the note, excluding YAML header, H1, and tags. */
-    public readonly body: string
+    public body: string
+
+    /** The H1 title inside the note, which may not match the database title because it can be inferred or otherwise computed */
+    public h1: string | undefined
 
     /** The YAML header of the note, which might be an empty structure if it's missing. */
-    public readonly frontMatter: YamlStruct
+    public frontMatter: YamlStruct
 
     constructor(
         public readonly database: BearSqlDatabase,
@@ -178,7 +180,13 @@ export class BearSqlNote {
         this.frontMatter = ym.data
 
         // Remove the H1 if it's there
-        this.body = this.body.replace(/^#\s+[^\n]*\n/m, '').trimStart()
+        {
+            const m = this.body.match(/^#\s+([^\n]*)\n/m)
+            if (m) {
+                this.h1 = m[1].trim()
+                this.body = this.body.replace(/^#\s+([^\n])*\n/m, '').trimStart()
+            }
+        }
 
         // Remove tags if they're there
         this.body = this.body.replaceAll(/^#[\w\/-]+(?:\n|$)/mg, '').trim()
@@ -251,6 +259,11 @@ export class BearSqlNote {
         return result.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
     }
 
+    /** If you've modified body, H1, or front-matter, saves that back to Bear in the background. */
+    save() {
+        this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, undefined, this.frontMatter), 'replace_all')
+    }
+
     /**
      * Computes complete Bear note content given inputs in pieces.
      * 
@@ -261,9 +274,9 @@ export class BearSqlNote {
      * @param tags The (optional) list of tags to apply to the note
      * @param meta The (optional) YAML-compatible meta-data to add to the top of the note
      */
-    static createStructuredContent(title: string | Nullish, body: string | Nullish, tags: string[] | Nullish = undefined, meta: YamlStruct | Nullish = undefined): string {
+    static createStructuredContent(title: string | Nullish, body: string | Nullish, tags: string[] | Nullish = undefined, frontMatter: YamlStruct | Nullish = undefined): string {
         const tagContent = isNonEmptyArray(tags) ? "\n" + tags.map(tag => '#' + tag + "\n").join('') : ""
-        const metaContent = (meta && objectLength(meta) > 0) ? "---\n" + toYamlString(meta) + "---\n\n" : ""
+        const metaContent = (frontMatter && objectLength(frontMatter) > 0) ? "---\n" + toYamlString(frontMatter) + "---\n\n" : ""
         const titleContent = title ? `# ${title.trim()}\n\n` : ""
         const bodyContent = body ? body.trimEnd() + "\n" : ""
         return metaContent + titleContent + bodyContent + tagContent
@@ -276,7 +289,7 @@ export class BearSqlNote {
      * @param mode How to update the text.  `replace` means everything but the title; `replace_all` includes the title.
      * @param openNewNote If true, physically opens the note in the Bear app
      */
-    setContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all") {
+    setRawContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all") {
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-text
         bearXCall("add-text", {
             id: this.uniqueId,
@@ -384,7 +397,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         // Wait for it to appear
         const note = await busyWait(100, () => this.getNoteByTitle(tempTitle))
         // Replace its content with the right content
-        note.setContent(content, 'replace_all')
+        note.setRawContent(content, 'replace_all')
         return note
     }
 
@@ -497,10 +510,10 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // Get structured information from a note
     let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
     invariant(note)
-    console.log(note.rawContent)
-    console.log(note.toString())
-    console.log(note.body)
-    console.log(note.frontMatter)
+    const frontMatter: { baz: number } = note.frontMatter as any
+    note.h1 += '!'
+    frontMatter.baz += 1
+    note.save()
 
     // Create a note
     // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
