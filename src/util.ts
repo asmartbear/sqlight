@@ -22,3 +22,16 @@ export function betterEncodeUriComponent(s: string): string {
     const bytes = new TextEncoder().encode(s)
     return Array.from(bytes).map(_byteToUriChars).join('')
 }
+
+/**
+ * Yields the processor for some given ms (can be `0`) while some condition is false or null or undefined.
+ * Will not yield at all if the condition is already true.
+ * Function can be promise-based or not
+ */
+export async function busyWait<T>(msBetween: number, fIsReady: () => T | false | null | undefined | Promise<T | false | null | undefined>): Promise<T> {
+    while (true) {
+        const x = await fIsReady()
+        if (x) return x
+        await new Promise(resolve => setTimeout(resolve, msBetween))
+    }
+}

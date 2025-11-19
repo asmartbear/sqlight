@@ -1,8 +1,10 @@
 import { exec } from 'child_process';
+import { randomUUID } from 'crypto';
+
 import { SCHEMA, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
-import { betterEncodeUriComponent } from './util'
+import { betterEncodeUriComponent, busyWait } from './util'
 
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
@@ -220,6 +222,29 @@ export class BearSqlNote {
         const result = await this.database.selectAll(q)
         return result.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
     }
+
+    /**
+     * Updates the text of this note.  Happens in the background; you can't tell exactly when it will complete, but usually within a few seconds.  The local in-memory object updates immediately.
+     * 
+     * @param content to append, prepend, or replace; if full replacement, you might want to use `BearNote.createBearNoteContent()` to produce it.
+     * @param mode How to update the text.  `replace` means everything but the title; `replace_all` includes the title.
+     * @param openNewNote If true, physically opens the note in the Bear app
+     */
+    setContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all", open: boolean = false) {
+        // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-text
+        bearXCall("add-text", {
+            id: this.uniqueId,
+            text: content,
+            mode: mode,
+            show_window: open ? "yes" : "no",
+            edit: open ? "yes" : "no",
+            new_window: open ? "yes" : "no",
+        })
+        this.row.ZTEXT = content
+        if (open) {
+            openCmd('/Applications/Bear.app')
+        }
+    }
 }
 
 /** Options for how to query notes in Bear. */
@@ -275,6 +300,21 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         if (openNewNote) {
             openCmd('/Applications/Bear.app')
         }
+    }
+
+    /**
+     * Creates a new note with the given content, then waits for it to appear in the database,
+     * then returns the database record.  This allows you to know things like its unique ID.
+     */
+    async createAndReturnNote(content: string): Promise<BearSqlNote> {
+        // Create a note with bogus, uniquely identifiable content
+        const tempTitle = `New note ${randomUUID()}`
+        BearSqlDatabase.createNote(`# ${tempTitle}\n\n`, false)
+        // Wait for it to appear
+        const note = await busyWait(100, () => this.getNoteByTitle(tempTitle))
+        // Replace its content with the right content
+        note.setContent(content, 'replace_all')
+        return note
     }
 
     /** Retrieves all tags in the system */
@@ -344,7 +384,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 
         // Run the query
         q.setLimit(options.limit)
-        console.log(q.toSql())
         const rows = await this.selectAll(q)
         return rows.map(r => new BearSqlNote(this, r))
     }
@@ -357,6 +396,15 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
      */
     async getNoteByUniqueId(uniqueId: string): Promise<BearSqlNote | undefined> {
         return (await this.getNotes({ limit: 1, uniqueId, includeInactive: true, includeInConflict: true }))[0]
+    }
+
+    /** 
+     * Extracts one note by its title, or `undefined` if we can't find it.
+     * 
+     * It's possible that multiple notes could match; we return the one that was modified most recently.
+     */
+    async getNoteByTitle(title: string): Promise<BearSqlNote | undefined> {
+        return (await this.getNotes({ limit: 1, titleExact: title, orderBy: 'newest' }))[0]
     }
 }
 
@@ -374,7 +422,8 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     console.log(notes.map(x => x.toString()))
 
     // Create a note
-    BearSqlDatabase.createNote("this is a new creation", true)
+    const newNote = await db.createAndReturnNote("this isn't a new creation... again")
+    console.log(newNote.toString())
 
     return "done"
 })().then(console.log)
