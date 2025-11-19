@@ -1,11 +1,31 @@
+import { exec } from 'child_process';
 import { SCHEMA, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
+import { betterEncodeUriComponent } from './util'
 
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
     // need to add the following offset to the timestamps to get a unix timestamp
     return new Date((ts + 978307200) * 1000)
+}
+
+/**
+ * Run an `xcall` URL, without waiting for it to complete.
+ */
+function bearXCall(cmd: string, args?: Record<string, string>) {
+    let urlArgs = ''
+    const argList = args ? Object.entries(args) : []
+    if (argList.length > 0) {
+        urlArgs = '?' + argList.map(pair => `${betterEncodeUriComponent(pair[0])}=${betterEncodeUriComponent(pair[1])}`).join('&')
+    }
+    const url = `bear://x-callback-url/${cmd}${urlArgs}`
+    console.log(url)
+    exec(`open '${url}'`)
+}
+
+function openCmd(path: string) {
+    exec(`open '${path}'`);
 }
 
 const BearSchema = SCHEMA({
@@ -64,8 +84,8 @@ const BearSchema = SCHEMA({
                 ZNORMALIZEDFILEEXTENSION: { type: 'VARCHAR' },
                 ZFILENAME: { type: 'VARCHAR' },
                 ZUNIQUEIDENTIFIER: { type: 'VARCHAR' },
-                ZCREATIONDATE: { type: 'TIMESTAMP' },
-                ZMODIFICATIONDATE: { type: 'TIMESTAMP' },
+                ZCREATIONDATE: { type: 'REAL' },
+                ZMODIFICATIONDATE: { type: 'REAL' },
                 ZSEARCHTEXT: { type: 'VARCHAR' },
             }
         },
@@ -75,6 +95,45 @@ const BearSchema = SCHEMA({
 /** Bear attachment on disk that is related to a Note */
 export class BearSqlAttachment {
 
+    /** Full path to the attachment on disk */
+    public readonly fullPath: string
+
+    constructor(
+        shinyFrogApplicationDataPath: string,
+        private readonly row: {
+            ZUNIQUEIDENTIFIER: string,
+            ZFILENAME: string,
+            ZNORMALIZEDFILEEXTENSION: string,
+            ZCREATIONDATE: number,
+            ZMODIFICATIONDATE: number,
+        }
+    ) {
+        this.fullPath = `${shinyFrogApplicationDataPath}/Local Files/${row.ZNORMALIZEDFILEEXTENSION.match(/^(?:jpe?g|png|gif|heic|jpg|tiff|webp)$/) ? "Note Images" : "Note Files"}/${row.ZUNIQUEIDENTIFIER}/${row.ZFILENAME}`
+    }
+
+    /** The name of the uploaded file without the rest of the path, also as mapped into the note */
+    get filename(): string {
+        return this.row.ZFILENAME
+    }
+
+    /** The normalized file extension of the filename */
+    get extension(): string {
+        return this.row.ZNORMALIZEDFILEEXTENSION
+    }
+
+    /** Gets the date this attachment was created. */
+    get createdOn(): Date {
+        return bearTimestampToDate(this.row.ZCREATIONDATE)
+    }
+
+    /** Gets the date this attachment was last modified. */
+    get modifiedOn(): Date {
+        return bearTimestampToDate(Math.max(this.row.ZCREATIONDATE, this.row.ZMODIFICATIONDATE))
+    }
+
+    toString(): string {
+        return this.fullPath
+    }
 }
 
 /** Post-processed note from Bear */
@@ -143,6 +202,24 @@ export class BearSqlNote {
     toString(): string {
         return `${this.pk}/${this.uniqueId}${this.isActive ? '' : '[inactive]'}${this.isInConflict ? '!!!' : ''}${this.hasAttachments ? '+++' : ''}: ${this.title} on ${this.modifiedOn}`
     }
+
+    /** Loads list of note-attachments from the database, but only if they have been downloaded locally. */
+    async getAttachments(): Promise<BearSqlAttachment[]> {
+        if (!this.hasAttachments) return []          // only if there are any
+        const start = this.database.select()
+        const att = start.from('a', 'ZSFNOTEFILE').col
+        const q = start
+            .passThrough(att.ZUNIQUEIDENTIFIER)
+            .passThrough(att.ZFILENAME)
+            .passThrough(att.ZNORMALIZEDFILEEXTENSION)
+            .passThrough(att.ZCREATIONDATE)
+            .passThrough(att.ZMODIFICATIONDATE)
+            .where(att.ZNOTE.eq(this.row.Z_PK))
+            .where(att.ZPERMANENTLYDELETED.not())
+            .where(att.ZDOWNLOADED)
+        const result = await this.database.selectAll(q)
+        return result.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
+    }
 }
 
 /** Options for how to query notes in Bear. */
@@ -173,8 +250,31 @@ export type BearTag = {
 
 /** A Sqlite database, specifically for Bear, allowing arbitrary queries but also some useful built-ins. */
 export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>> {
+
+    public readonly shinyFrogApplicationDataPath: string
+
     constructor() {
-        super(BearSchema, `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`)
+        const root = `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data`
+        super(BearSchema, `${root}/database.sqlite`)
+        this.shinyFrogApplicationDataPath = root
+    }
+
+    /**
+     * Creates a new generic Bear note.
+     * 
+     * @param content The raw content of the note; recommmend using `BearNote.createBearNoteContent()` to produce this.
+     * @param openNewNote If true, physically opens the note in the Bear app
+     */
+    static createNote(content: string, openNewNote: boolean) {
+        bearXCall("create", {
+            text: content,
+            open_note: openNewNote ? "yes" : "no",
+            show_window: openNewNote ? "yes" : "no",
+            new_window: openNewNote ? "yes" : "no",
+        })
+        if (openNewNote) {
+            openCmd('/Applications/Bear.app')
+        }
     }
 
     /** Retrieves all tags in the system */
@@ -262,12 +362,19 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 
 (async () => {
     const db = new BearSqlDatabase()
-    console.log(await db.getTables())
-    const result = await db.getNotes({
+    // console.log(await db.getTables())
+
+    // Notes
+    const notes = await db.getNotes({
         limit: 5,
         orderBy: 'newest',
         tagsInclude: ['book/idea'],
     })
     await db.close()
-    return result.map(x => x.toString())
+    console.log(notes.map(x => x.toString()))
+
+    // Create a note
+    BearSqlDatabase.createNote("this is a new creation", true)
+
+    return "done"
 })().then(console.log)
