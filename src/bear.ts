@@ -104,15 +104,32 @@ export class BearSqlNote {
     }
 }
 
+/**
+ * Options for how to query notes in Bear.
+ */
+export type NoteQueryOptions = {
+    /** Maximum number of notes to return */
+    limit: number
+    /** Limit to the note with this unique identifier */
+    uniqueId?: string
+    /** Only notes where the title exactly equals this */
+    titleExact?: string
+    /** How to order the returned notes. */
+    orderBy?: 'newest' | 'oldest'
+    /** Normally inactive notes are ignored, but you can include them. */
+    includeInactive?: boolean
+}
+
 /** A Sqlite database, specifically for Bear, allowing arbitrary queries but also some useful built-ins. */
 export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>> {
     constructor() {
         super(BearSchema, `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite`)
     }
 
-    async getNotes() {
+    async getNotes(options: NoteQueryOptions) {
         const shell = this.select()
         const notes = shell.from('n', 'ZSFNOTE')
+        const isActive = OR(notes.col.ZARCHIVED, notes.col.ZTRASHED, notes.col.ZPERMANENTLYDELETED).not()
         const q = shell
             .passThrough(notes.col.Z_PK)
             .passThrough(notes.col.ZUNIQUEIDENTIFIER)
@@ -121,17 +138,44 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             .passThrough(notes.col.ZCONFLICTUNIQUEIDENTIFIER)
             .passThrough(notes.col.ZCREATIONDATE)
             .passThrough(notes.col.ZMODIFICATIONDATE)
-            .select('isActive', OR(notes.col.ZARCHIVED, notes.col.ZTRASHED, notes.col.ZPERMANENTLYDELETED).not())
-        q.setLimit(10).orderBy(notes.col.ZMODIFICATIONDATE, 'DESC')
+            .select('isActive', isActive)
+
+        // Apply various filters
+        if (!options.includeInactive) {
+            q.where(isActive)
+        }
+        if (options.uniqueId) {
+            q.where(notes.col.ZUNIQUEIDENTIFIER.eq(options.uniqueId))
+        }
+        if (options.titleExact) {
+            q.where(notes.col.ZTITLE.eq(options.titleExact))
+        }
+
+        // Apply ordering
+        switch (options.orderBy) {
+            case 'newest': q.orderBy(notes.col.ZMODIFICATIONDATE, 'DESC'); break
+            case 'oldest': q.orderBy(notes.col.ZMODIFICATIONDATE, 'ASC'); break
+        }
+
+        // Run the query
+        q.setLimit(options.limit)
         const rows = await this.selectAll(q)
         console.log(q.toSql())
-        return rows.map(r => new BearSqlNote(r).toString())
+        return rows.map(r => new BearSqlNote(r))
+    }
+
+    async getNoteByUniqueId(uniqueId: string): Promise<BearSqlNote | undefined> {
+        return (await this.getNotes({ limit: 1, uniqueId }))[0]
     }
 }
 
 (async () => {
     const db = new BearSqlDatabase()
-    const result = await db.getNotes()
+    const result = await db.getNotes({
+        limit: 5,
+        orderBy: 'newest',
+    })
+    // const result = await db.getNoteByUniqueId('2252DCEB-5826-4079-893B-C94825EC31EC')
     await db.close()
-    return result
+    return result.map(x => x.toString())
 })().then(console.log)
