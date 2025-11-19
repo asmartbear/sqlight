@@ -1,6 +1,6 @@
 import { SCHEMA, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
-import { NativeForRowColumns } from './types'
+import { OR } from './expr'
 
 function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
@@ -16,23 +16,23 @@ const BearSchema = SCHEMA({
                 // Z_ENT: { type: 'INTEGER' },
                 // Z_OPT: { type: 'INTEGER' },
                 ZUNIQUEIDENTIFIER: { type: 'VARCHAR' },
-                ZARCHIVED: { type: 'INTEGER' },
-                ZENCRYPTED: { type: 'INTEGER' },
-                ZHASFILES: { type: 'INTEGER' },
-                ZHASIMAGES: { type: 'INTEGER' },
+                ZARCHIVED: { type: 'BOOLEAN' },
+                ZENCRYPTED: { type: 'BOOLEAN' },
+                ZHASFILES: { type: 'BOOLEAN' },
+                ZHASIMAGES: { type: 'BOOLEAN' },
                 // ZVERSION: { type: 'INTEGER' },
-                ZLOCKED: { type: 'INTEGER' },
+                ZLOCKED: { type: 'BOOLEAN' },
                 // ZORDER: { type: 'INTEGER' },
-                ZPERMANENTLYDELETED: { type: 'INTEGER' },
-                ZTRASHED: { type: 'INTEGER' },
-                ZPINNED: { type: 'INTEGER' },
+                ZPERMANENTLYDELETED: { type: 'BOOLEAN' },
+                ZTRASHED: { type: 'BOOLEAN' },
+                ZPINNED: { type: 'BOOLEAN' },
 
                 ZCREATIONDATE: { type: 'REAL' },
                 ZMODIFICATIONDATE: { type: 'REAL' },
-                // ZTRASHEDDATE: { type: 'REAL' },
-                // ZARCHIVEDDATE: { type: 'REAL', nullable: true },
+                ZTRASHEDDATE: { type: 'REAL' },
+                ZARCHIVEDDATE: { type: 'REAL', nullable: true },
 
-                // ZCONFLICTUNIQUEIDENTIFIERDATE: { type: 'REAL', nullable: true },
+                ZCONFLICTUNIQUEIDENTIFIERDATE: { type: 'REAL', nullable: true },
                 ZCONFLICTUNIQUEIDENTIFIER: { type: 'VARCHAR', nullable: true },
 
                 // ZSUBTITLE: { type: 'VARCHAR' },
@@ -46,7 +46,16 @@ const BearSchema = SCHEMA({
 /** Post-processed note from Bear */
 export class BearSqlNote {
     constructor(
-        private readonly row: NativeForRowColumns<TablesOf<typeof BearSchema>["ZSFNOTE"]["columns"]>
+        private readonly row: {
+            Z_PK: number,
+            ZUNIQUEIDENTIFIER: string,
+            ZTITLE: string,
+            ZTEXT: string,
+            isActive: boolean,
+            ZCONFLICTUNIQUEIDENTIFIER: string,
+            ZCREATIONDATE: number,
+            ZMODIFICATIONDATE: number,
+        }
     ) {
     }
 
@@ -72,7 +81,7 @@ export class BearSqlNote {
 
     /** True if this note hasn't been archived or deleted. */
     get isActive(): boolean {
-        return !this.row.ZARCHIVED && !this.row.ZTRASHED && !this.row.ZPERMANENTLYDELETED
+        return this.row.isActive
     }
 
     /** True if this note is in a "conflicted" state due to synchronization issues. */
@@ -102,17 +111,21 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     }
 
     async getNotes() {
-
         const shell = this.select()
         const notes = shell.from('n', 'ZSFNOTE')
         const q = shell
             .passThrough(notes.col.Z_PK)
             .passThrough(notes.col.ZUNIQUEIDENTIFIER)
             .passThrough(notes.col.ZTITLE)
-        q.setLimit(5).orderBy(notes.col.ZMODIFICATIONDATE, 'DESC')
+            .passThrough(notes.col.ZTEXT)
+            .passThrough(notes.col.ZCONFLICTUNIQUEIDENTIFIER)
+            .passThrough(notes.col.ZCREATIONDATE)
+            .passThrough(notes.col.ZMODIFICATIONDATE)
+            .select('isActive', OR(notes.col.ZARCHIVED, notes.col.ZTRASHED, notes.col.ZPERMANENTLYDELETED).not())
+        q.setLimit(10).orderBy(notes.col.ZMODIFICATIONDATE, 'DESC')
         const rows = await this.selectAll(q)
-        return rows
-        // return rows.map(r => new BearSqlNote(r))
+        console.log(q.toSql())
+        return rows.map(r => new BearSqlNote(r).toString())
     }
 }
 

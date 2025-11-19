@@ -126,6 +126,11 @@ export function OR(...list: readonly SqlInputValue<'BOOLEAN'>[]): SqlExpression<
     return new SqlBinaryOperator('BOOLEAN', ' OR ', EXPRs(list))
 }
 
+/** 'NOT' operator */
+export function NOT(x: SqlInputValue<'BOOLEAN'>): SqlExpression<'BOOLEAN'> {
+    return new SqlUnaryOperator('BOOLEAN', 'NOT (', EXPR(x), ')')
+}
+
 /**
  * A series of `CASE WHEN ... THEN ... END` expressions as tuples, and optionally another expression for `ELSE`.
  * If you don't have an expression for `ELSE`, it will return `NULL`.
@@ -170,6 +175,7 @@ export abstract class SqlExpression<D extends SqlType> {
 
     and(rhs: SqlInputValue<'BOOLEAN'>) { return AND(this, rhs) }
     or(rhs: SqlInputValue<'BOOLEAN'>) { return OR(this, rhs) }
+    not() { return NOT(this) }
 
     add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs)) }
     sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<R extends 'REAL' ? 'REAL' : D extends 'REAL' ? 'REAL' : 'INTEGER'> { return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs)) }
@@ -222,6 +228,26 @@ class SqlIsNotNull extends SqlExpression<'BOOLEAN'> {
     constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN') }
     canBeNull(): boolean { return false }
     toSql() { return `${this.ex.toSql(true)} IS NOT NULL` }
+}
+
+/** Any unary operator. */
+class SqlUnaryOperator<D extends SqlType> extends SqlExpression<D> {
+    constructor(
+        type: D,
+        private readonly prefix: string,
+        private readonly x: SqlExpression<SqlType>,
+        private readonly suffix: string,
+    ) { super(type) }
+
+    canBeNull(): boolean {
+        return this.x.canBeNull()
+    }
+
+    toSql(grouped: boolean) {
+        let sql = this.prefix + this.x.toSql(false) + this.suffix
+        if (grouped) sql = '(' + sql + ')'
+        return sql
+    }
 }
 
 /** Any binary operator, but also can be a list of more than two, where all are chained together. */

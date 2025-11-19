@@ -81,7 +81,8 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
 
     /** Runs a query inside the mutex, returning the first row or `undefined` if no rows. */
     selectOne<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<typeof select> | undefined> {
-        return this.queryOne(select.toSql())
+        // Limits to 1, since we're selecting only one!
+        return this.queryOne(select.setLimit(1).toSql())
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */

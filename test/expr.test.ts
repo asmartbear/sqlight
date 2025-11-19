@@ -171,6 +171,14 @@ test('div', () => {
     T.be(s.canBeNull(), false)
 })
 
+test('not', () => {
+    const s = S.EXPR(false).not()
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), "NOT (FALSE)")
+    T.be(s.toSql(true), "(NOT (FALSE))")
+    T.be(s.canBeNull(), false)
+})
+
 test('is null', () => {
     const s = S.EXPR("foo").isNull()
     T.be(s.type, "BOOLEAN")
