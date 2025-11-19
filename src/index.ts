@@ -1,2 +1,5 @@
 export * from './types'
 export * from './expr'
+export { SCHEMA } from './schema'
+export { SqlightDatabase } from './db'
+export { BearDatabase } from './bear'

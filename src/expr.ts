@@ -16,6 +16,7 @@ export type SqlExprFromNative<T> =
     T extends boolean ? SqlLiteral<'BOOLEAN', T> :
     T extends string ? SqlLiteral<'TEXT', T> :
     T extends number ? SqlLiteral<SqlTypeFor<T>, NativeFor<SqlTypeFor<T>>> :
+    T extends Date ? SqlLiteral<'TIMESTAMP', T> :
     T extends Buffer ? SqlLiteral<'BLOB', T> :
     T extends SqlExpression<infer U> ? T :
     never;
@@ -31,12 +32,12 @@ type SqlTypedGeneral<D extends SqlType> =
 
 /** A BOOLEAN-typed literal */
 export function BOOL<T extends boolean>(x: T) {
-    return new SqlLiteral('BOOLEAN', x)
+    return new SqlBooleanLiteral(x)
 }
 
 /** A TEXT-typed literal */
 export function STR<T extends string>(x: T) {
-    return new SqlLiteral('TEXT', x)
+    return new SqlStringLiteral(x)
 }
 
 /** An INT-typed literal */
@@ -49,24 +50,30 @@ export function FLOAT<T extends number>(x: T) {
     return new SqlLiteral('REAL', x)
 }
 
+/** An TIMESTAMP-typed literal */
+export function DATE<T extends Date>(x: T) {
+    return new SqlDateLiteral(x)
+}
+
 /** An BLOB-typed literal */
 export function BLOB<T extends Buffer>(x: T) {
-    return new SqlLiteral('BLOB', x)
+    return new SqlBufferLiteral(x)
 }
 
 /**
  * Converts a native Typescript value into a SQL literal, or passes a SqlExpression through unchanged.
  * Essentially converts any kind of input value into something SQL understands.
  */
-export function EXPR<V extends string | boolean | number | Buffer>(x: V): SqlExprFromNative<V>;
+export function EXPR<V extends string | boolean | number | Buffer | Date>(x: V): SqlExprFromNative<V>;
 export function EXPR<D extends SqlType>(x: SqlExpression<D>): typeof x;             // pass-through when we know it
 export function EXPR<D extends SqlType>(x: SqlInputValue<D>): SqlExpression<D>;     // conversion when it's any input value
-export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer): SqlExpression<any> {
+export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer | Date): SqlExpression<any> {
     // istanbul ignore next
     if (x instanceof SqlExpression) return x
     if (typeof x === "string") return STR(x)
     if (typeof x === "number") return Number.isInteger(x) ? INT(x) : FLOAT(x)
     if (typeof x === "boolean") return BOOL(x)
+    if (x instanceof Date) return DATE(x)
     if (x instanceof Buffer) return BLOB(x)
     throw new Error(`Unsupported literal type: ${typeof x}: [${x}]`)
 }
@@ -179,17 +186,30 @@ export abstract class SqlExpression<D extends SqlType> {
 class SqlLiteral<D extends SqlType, T extends NativeFor<D>> extends SqlExpression<D> {
     constructor(
         type: D,
-        private readonly value: T,
+        protected readonly value: T,
     ) { super(type) }
-
     canBeNull(): boolean { return false }
+    toSql() { return String(this.value) }
+}
 
-    toSql() {
-        if (typeof this.value === "boolean") return this.value ? 'TRUE' : 'FALSE'
-        if (typeof this.value === "string") return `'${this.value.replace(/'/g, "''")}'`
-        if (this.value instanceof Buffer) return `x'${this.value.toString("hex")}'`
-        return String(this.value)
-    }
+class SqlBooleanLiteral extends SqlLiteral<'BOOLEAN', boolean> {
+    constructor(x: boolean) { super('BOOLEAN', x) }
+    toSql() { return this.value ? 'TRUE' : 'FALSE' }
+}
+
+class SqlStringLiteral extends SqlLiteral<'TEXT', string> {
+    constructor(x: string) { super('TEXT', x) }
+    toSql() { return `'${this.value.replace(/'/g, "''")}'` }
+}
+
+class SqlDateLiteral extends SqlLiteral<'TIMESTAMP', Date> {
+    constructor(x: Date) { super('TIMESTAMP', x) }
+    toSql() { return this.value.toISOString() }
+}
+
+class SqlBufferLiteral extends SqlLiteral<'BLOB', Buffer> {
+    constructor(x: Buffer) { super('BLOB', x) }
+    toSql() { return `x'${this.value.toString("hex")}'` }
 }
 
 class SqlIsNull extends SqlExpression<'BOOLEAN'> {
