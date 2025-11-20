@@ -35,7 +35,7 @@ Unit tests, refreshed live:
 npm run watch
 ```
 
-Prepare for release (e.g. run tests and bump version number):
+Prepare for release (e.g. run tests and bump version number), and then release:
 
 ```bash
 npm run release && git push --follow-tags origin main && npm publish

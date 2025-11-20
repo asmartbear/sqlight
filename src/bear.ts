@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { randomUUID } from 'crypto';
 
-import { SCHEMA, TablesOf } from './schema'
+import { SCHEMA, SqlJoinType, SqlSelect, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
 import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength } from './util'
@@ -433,24 +433,20 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         return this.selectAll(q)
     }
 
-    /** Queries for notes in Bear, returning structured objects with additional abilities. */
-    async getNotes(options: BearNoteQueryOptions) {
-        const shell = this.select()
-        const notes = shell.from('n', 'ZSFNOTE').col
+    /**
+     * Constructs a `SqlSelect` object and 'notes' tables, applying a range of options, but
+     * not yet adding any select columns, so the caller can decide which fields it is interested in,
+     * and make other changes to the query before submitting it.
+     * 
+     * @returns `{select: SqlSelect, notes: {[col]:Sql}, isActive: Sql }`
+     */
+    getNoteSelect(options: BearNoteQueryOptions) {
+        const q = this.select()
+        const notes = q.from('n', 'ZSFNOTE').col
         const isActive = OR(notes.ZARCHIVED, notes.ZTRASHED, notes.ZPERMANENTLYDELETED).not()
-        const q = shell
-            .passThrough(notes.Z_PK)
-            .passThrough(notes.ZUNIQUEIDENTIFIER)
-            .passThrough(notes.ZTITLE)
-            .passThrough(notes.ZTEXT)
-            .passThrough(notes.ZCONFLICTUNIQUEIDENTIFIER)
-            .passThrough(notes.ZCREATIONDATE)
-            .passThrough(notes.ZMODIFICATIONDATE)
-            .passThrough(notes.ZMODIFICATIONDATE)
-            .select('isActive', isActive)
-            .select('hasAttachments', notes.ZHASFILES.or(notes.ZHASIMAGES))
 
-        // Apply various filters
+        // Apply simple filters
+        q.setLimit(options.limit)
         if (!options.includeInactive) {
             q.where(isActive)
         }
@@ -491,8 +487,29 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             case 'oldest': q.orderBy(notes.ZMODIFICATIONDATE, 'ASC'); break
         }
 
+        // Done
+        return { select: q, notes, isActive }
+    }
+
+    /** Queries for notes in Bear, returning structured objects with additional abilities. */
+    async getNotes(options: BearNoteQueryOptions) {
+
+        // Build the query
+        const { select, notes, isActive } = this.getNoteSelect(options)
+        const q = select
+            .passThrough(notes.Z_PK)
+            .passThrough(notes.ZUNIQUEIDENTIFIER)
+            .passThrough(notes.ZTITLE)
+            .passThrough(notes.ZTEXT)
+            .passThrough(notes.ZCONFLICTUNIQUEIDENTIFIER)
+            .passThrough(notes.ZCREATIONDATE)
+            .passThrough(notes.ZMODIFICATIONDATE)
+            .passThrough(notes.ZMODIFICATIONDATE)
+            .select('isActive', isActive)
+            .select('hasAttachments', notes.ZHASFILES.or(notes.ZHASIMAGES))
+
+
         // Run the query
-        q.setLimit(options.limit)
         const rows = await this.selectAll(q)
         return rows.map(r => new BearSqlNote(this, r))
     }
@@ -515,19 +532,30 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     async getNoteByTitle(title: string): Promise<BearSqlNote | undefined> {
         return (await this.getNotes({ limit: 1, titleExact: title, orderBy: 'newest' }))[0]
     }
+
+    /** Runs a query, returning a simple array of unique IDs of the notes that match. */
+    async getNoteUniqueIDs(options: BearNoteQueryOptions): Promise<string[]> {
+        const { select, notes } = this.getNoteSelect(options)
+        const q = select
+            .select('uid', notes.ZUNIQUEIDENTIFIER)
+        return (await this.selectAll(q)).map(row => row.uid)
+    }
 }
 
 // (async () => {
-//     const db = new BearSqlDatabase()
-//     // console.log(await db.getTables())
+//     const db = BearSqlDatabase.singleton
+// console.log(await db.getTables())
 
 //     // Notes
-//     const notes = await db.getNotes({
-//         limit: 50,
-//         orderBy: 'newest',
-//         modifiedAfter: new Date(2025, 10, 19),
-//     })
-//     console.log(notes.map(x => x.toString()))
+// const filter: BearNoteQueryOptions = {
+//     limit: 50,
+//     orderBy: 'newest',
+//     modifiedAfter: new Date(2025, 10, 19),
+// }
+// const notes = await db.getNotes(filter)
+// console.log(notes.map(x => x.toString()))
+
+// console.log(await db.getNoteUniqueIDs(filter))
 
 //     // Attachments
 //     for (const note of notes) {
