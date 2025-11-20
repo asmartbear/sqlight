@@ -7,7 +7,7 @@ import { OR } from './expr'
 import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength } from './util'
 import { Nullish } from './types';
 import { parseYaml, toYamlString, YamlStruct } from './yaml';
-import invariant from 'tiny-invariant';
+import { Path } from '@asmartbear/filesystem';
 
 const BEAR_EPOCH = 978307200
 
@@ -108,10 +108,9 @@ const BearSchema = SCHEMA({
 export class BearSqlAttachment {
 
     /** Full path to the attachment on disk */
-    public readonly fullPath: string
+    public readonly path: Path
 
     constructor(
-        shinyFrogApplicationDataPath: string,
         private readonly row: {
             ZUNIQUEIDENTIFIER: string,
             ZFILENAME: string,
@@ -120,7 +119,7 @@ export class BearSqlAttachment {
             ZMODIFICATIONDATE: number,
         }
     ) {
-        this.fullPath = `${shinyFrogApplicationDataPath}/Local Files/${row.ZNORMALIZEDFILEEXTENSION.match(/^(?:jpe?g|png|gif|heic|jpg|tiff|webp)$/) ? "Note Images" : "Note Files"}/${row.ZUNIQUEIDENTIFIER}/${row.ZFILENAME}`
+        this.path = BearSqlDatabase.SHINY_FROG_APPLICATION_DATA_PATH.join("Local Files", row.ZNORMALIZEDFILEEXTENSION.match(/^(?:jpe?g|png|gif|heic|jpg|tiff|webp)$/) ? "Note Images" : "Note Files", row.ZUNIQUEIDENTIFIER, row.ZFILENAME)
     }
 
     /** The name of the uploaded file without the rest of the path, also as mapped into the note */
@@ -144,7 +143,7 @@ export class BearSqlAttachment {
     }
 
     toString(): string {
-        return this.fullPath
+        return this.path.toString()
     }
 }
 
@@ -268,7 +267,7 @@ export class BearSqlNote {
             .where(att.ZPERMANENTLYDELETED.not())
             .where(att.ZDOWNLOADED)
         const rows = await this.database.selectAll(q)
-        return rows.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
+        return rows.map(row => new BearSqlAttachment(row))
     }
 
     /** If you've modified body, H1, or front-matter, saves that back to Bear in the background. */
@@ -380,12 +379,11 @@ export type BearTag = {
 /** A Sqlite database, specifically for Bear, allowing arbitrary queries but also some useful built-ins. */
 export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>> {
 
-    public readonly shinyFrogApplicationDataPath: string
+    /** Path to the "Application Data" directory for Bear App. */
+    static SHINY_FROG_APPLICATION_DATA_PATH = Path.userHomeDir.join(`Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data`)
 
     constructor() {
-        const root = `${process.env.HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data`
-        super(BearSchema, `${root}/database.sqlite`)
-        this.shinyFrogApplicationDataPath = root
+        super(BearSchema, BearSqlDatabase.SHINY_FROG_APPLICATION_DATA_PATH.join(`/database.sqlite`))
     }
 
     /**
@@ -516,16 +514,23 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 }
 
 // (async () => {
-// const db = new BearSqlDatabase()
-// console.log(await db.getTables())
+//     const db = new BearSqlDatabase()
+//     // console.log(await db.getTables())
 
-// Notes
-// const notes = await db.getNotes({
-//     limit: 50,
-//     orderBy: 'newest',
-//     modifiedAfter: new Date(2025, 10, 19),
-// })
-// console.log(notes.map(x => x.toString()))
+//     // Notes
+//     const notes = await db.getNotes({
+//         limit: 50,
+//         orderBy: 'newest',
+//         modifiedAfter: new Date(2025, 10, 19),
+//     })
+//     console.log(notes.map(x => x.toString()))
+
+//     // Attachments
+//     for (const note of notes) {
+//         for (const att of await note.getAttachments()) {
+//             console.log(att.toString())
+//         }
+//     }
 
 // Get structured information from a note
 // let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
@@ -547,5 +552,5 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 // console.log(newNote.toString())
 
 //     await db.close()
-// return "done"
+//     return "done"
 // })().then(console.log)

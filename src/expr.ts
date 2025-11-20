@@ -1,4 +1,4 @@
-import { invariant } from './invariant';
+import invariant from 'tiny-invariant';
 import { Nullish, SqlType, NativeFor, SqlTypeFor } from './types'
 
 /**

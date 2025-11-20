@@ -1,4 +1,4 @@
-import { invariant } from './invariant';
+import invariant from 'tiny-invariant';
 import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
 

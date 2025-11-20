@@ -2,6 +2,8 @@ import sqllite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import { Mutex } from 'async-mutex';
 
+import { Path } from '@asmartbear/filesystem';
+
 import { SchemaTable } from './types'
 import { SqlSchema, SqlSelect, NativeSelectRow } from './schema'
 
@@ -15,7 +17,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         /** Database schema */
         public readonly schema: SqlSchema<TABLES>,
         /** Path to the database on disk */
-        public readonly path: string,
+        public readonly sqliteDatabasePath: Path,
     ) {
         this.mutex = new Mutex()
     }
@@ -38,7 +40,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     private async open(): Promise<this> {
         if (!this._db) {
             this._db = await open({
-                filename: this.path,
+                filename: this.sqliteDatabasePath.absPath,
                 driver: sqllite3.Database,
             })
         }
