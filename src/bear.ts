@@ -147,6 +147,19 @@ export class BearSqlAttachment {
     }
 }
 
+/** The data from the standard SQL query for a note */
+export type BearNoteSqlRowData = {
+    Z_PK: number,
+    ZUNIQUEIDENTIFIER: string,
+    ZTITLE: string,
+    ZTEXT: string,
+    ZCONFLICTUNIQUEIDENTIFIER: string | null,
+    ZCREATIONDATE: number,
+    ZMODIFICATIONDATE: number,
+    isActive: boolean,
+    hasAttachments: boolean,
+}
+
 /** Post-processed note from Bear */
 export class BearSqlNote {
 
@@ -160,18 +173,8 @@ export class BearSqlNote {
     public frontMatter: YamlStruct
 
     constructor(
-        public readonly database: BearSqlDatabase,
-        private readonly row: {
-            Z_PK: number,
-            ZUNIQUEIDENTIFIER: string,
-            ZTITLE: string,
-            ZTEXT: string,
-            ZCONFLICTUNIQUEIDENTIFIER: string,
-            ZCREATIONDATE: number,
-            ZMODIFICATIONDATE: number,
-            isActive: boolean,
-            hasAttachments: boolean,
-        }
+        public readonly database: BearSqlDatabase | null,
+        private readonly row: BearNoteSqlRowData
     ) {
         // Parse out the front matter
         const ym = parseYaml(row.ZTEXT)
@@ -189,6 +192,11 @@ export class BearSqlNote {
 
         // Remove body tags if they're there
         this.body = this.body.replaceAll(/^#[a-zA-Z][\w\/-]+(?:\n|$)/mg, '').trim()
+    }
+
+    /** Creates a disconnected "fake" note, that will throw exceptions if you try to use functions that access a database. */
+    static makeFakeNote(row: BearNoteSqlRowData): BearSqlNote {
+        return new BearSqlNote(null, row)
     }
 
     /** The database-unique primary key of this note */
@@ -231,6 +239,11 @@ export class BearSqlNote {
         return bearTimestampToDate(Math.max(this.row.ZCREATIONDATE, this.row.ZMODIFICATIONDATE))
     }
 
+    /** Deep-link URL to the note inside the Bear app */
+    get deepLinkUrl(): string {
+        return `bear://x-callback-url/open-note?id=${this.uniqueId}`
+    }
+
     /** True if there are any kinds of file attachments on this note */
     get hasAttachments(): boolean {
         return this.row.hasAttachments
@@ -242,6 +255,7 @@ export class BearSqlNote {
 
     /** Loads the list of tags associated with this note in the database */
     async getTags(): Promise<Set<string>> {
+        if (!this.database) throw new Error("BearSqlNote.getTags() requires a live database.")
         const start = this.database.select()
         const map = start.from('m', 'Z_5TAGS').col
         const tags = start.from('t', 'ZSFNOTETAG', 'JOIN', t => t.col.Z_PK.eq(map.Z_13TAGS)).col
@@ -255,6 +269,7 @@ export class BearSqlNote {
     /** Loads list of note-attachments from the database, but only if they have been downloaded locally. */
     async getAttachments(): Promise<BearSqlAttachment[]> {
         if (!this.hasAttachments) return []          // only if there are any
+        if (!this.database) throw new Error("BearSqlNote.getAttachments() requires a live database (if there are attachments).")
         const start = this.database.select()
         const att = start.from('a', 'ZSFNOTEFILE').col
         const q = start
@@ -272,12 +287,14 @@ export class BearSqlNote {
 
     /** If you've modified body, H1, or front-matter, saves that back to Bear in the background. */
     async save(): Promise<void> {
+        if (!this.database) throw new Error("BearSqlNote.save() requires a live database.")
         const tags = await this.getTags()
         this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, Array.from(tags), this.frontMatter), 'replace_all')
     }
 
     /** Appends content to a note, in memory and in Bear.  No other changes will be saved! */
     append(txt: string) {
+        if (!this.database) throw new Error("BearSqlNote.append() requires a live database.")
         this.body += txt
         this.setRawContent(txt, 'append')
     }
@@ -308,6 +325,7 @@ export class BearSqlNote {
      * @param openNewNote If true, physically opens the note in the Bear app
      */
     setRawContent(content: string, mode: "prepend" | "append" | "replace" | "replace_all") {
+        if (!this.database) throw new Error("BearSqlNote.setRawContent() requires a live database.")
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-text
         bearXCall("add-text", {
             id: this.uniqueId,
@@ -320,6 +338,7 @@ export class BearSqlNote {
 
     /** Opens this note in the Bear application */
     openInBear(inNewWindow: boolean) {
+        if (!this.database) throw new Error("BearSqlNote.openInBear() requires a live database.")
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#open-note
         bearXCall("open-note", {
             id: this.uniqueId,
@@ -333,18 +352,12 @@ export class BearSqlNote {
      * Really moves it to the Trash, so it's still available, manually
      */
     deleteInBear() {
+        if (!this.database) throw new Error("BearSqlNote.deleteInBear() requires a live database.")
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#trash
         bearXCall("trash", {
             id: this.uniqueId,
             show_window: "no",
         })
-    }
-
-    /**
-     * Deep-link to the Note inside the Bear app
-     */
-    get deepLinkUrl(): string {
-        return `bear://x-callback-url/open-note?id=${this.uniqueId}`
     }
 }
 
