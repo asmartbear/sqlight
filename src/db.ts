@@ -1,10 +1,8 @@
-import sqlite3 from 'sqlite3';
+import sqllite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import { Mutex } from 'async-mutex';
 
-import { invariant } from './invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten } from './types'
-import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
+import { SchemaTable } from './types'
 import { SqlSchema, SqlSelect, NativeSelectRow } from './schema'
 
 
@@ -41,7 +39,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         if (!this._db) {
             this._db = await open({
                 filename: this.path,
-                driver: sqlite3.Database,
+                driver: sqllite3.Database,
             })
         }
         return this
