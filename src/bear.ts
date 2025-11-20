@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { SCHEMA, SqlJoinType, SqlSelect, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
-import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength } from './util'
+import { betterEncodeUriComponent, busyWait, isNonEmptyArray, objectLength, removeParentTags } from './util'
 import { Nullish } from './types';
 import { parseYaml, toYamlString, YamlStruct } from './yaml';
 import { Path } from '@asmartbear/filesystem';
@@ -263,7 +263,8 @@ export class BearSqlNote {
             .select('name', tags.ZTITLE)
             .where(map.Z_5NOTES.eq(this.pk))
         const rows = await this.database.selectAll(q)
-        return new Set(rows.map(r => r.name))
+        const tagList = rows.map(row => row.name)
+        return new Set(removeParentTags(tagList))
     }
 
     /** Loads list of note-attachments from the database, but only if they have been downloaded locally. */
@@ -563,17 +564,17 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 }
 
 // (async () => {
-//     const db = BearSqlDatabase.singleton
-// console.log(await db.getTables())
+//     const db = BearSqlDatabase.singleton()
+//     // console.log(await db.getTables())
 
-//     // Notes
-// const filter: BearNoteQueryOptions = {
-//     limit: 50,
-//     orderBy: 'newest',
-//     modifiedAfter: new Date(2025, 10, 19),
-// }
-// const notes = await db.getNotes(filter)
-// console.log(notes.map(x => x.toString()))
+//     //     // Notes
+//     const filter: BearNoteQueryOptions = {
+//         limit: 10,
+//         orderBy: 'newest',
+//         modifiedAfter: new Date(2025, 10, 19),
+//     }
+//     const notes = await db.getNotes(filter)
+//     console.log(await Promise.all(notes.map(x => x.getTags())))
 
 // console.log(await db.getNoteUniqueIDs(filter))
 

@@ -37,6 +37,22 @@ export async function busyWait<T>(msBetween: number, fIsReady: () => T | false |
     }
 }
 
+/**
+ * Given a set of tags in the form 'foo/bar', of any number of path components, deletes any "parent",
+ * meaning any tag that is strictly a parent of another given tag, returning the resulting new array.
+ */
+export function removeParentTags(tags: string[]): string[] {
+    // Look for any tag that is a parent-like prefix of another tag
+    const result: string[] = []
+    for (const tag of tags) {
+        const parentPrefix = tag + '/'        // if any other tag starts with this, we are a parent and should be skipped
+        if (!tags.find(t => t.startsWith(parentPrefix))) {
+            result.push(tag)
+        }
+    }
+    return result
+}
+
 export function isNonEmptyArray<T>(x: T[] | Nullish): x is T[] {
     return Array.isArray(x) && x.length > 0
 }
