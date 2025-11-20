@@ -382,9 +382,13 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     /** Path to the "Application Data" directory for Bear App. */
     static SHINY_FROG_APPLICATION_DATA_PATH = Path.userHomeDir.join(`Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data`)
 
-    constructor() {
+    /** Private to force you through the singleton */
+    private constructor() {
         super(BearSchema, BearSqlDatabase.SHINY_FROG_APPLICATION_DATA_PATH.join(`/database.sqlite`))
     }
+
+    /** Global singleton, to ensure global mutex on the database.  Database is not opened unless accessed, so this is efficient. */
+    static singleton = new BearSqlDatabase()
 
     /**
      * Creates a new generic Bear note.
