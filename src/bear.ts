@@ -515,37 +515,37 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     }
 }
 
-(async () => {
-    const db = new BearSqlDatabase()
-    // console.log(await db.getTables())
+// (async () => {
+// const db = new BearSqlDatabase()
+// console.log(await db.getTables())
 
-    // Notes
-    const notes = await db.getNotes({
-        limit: 50,
-        orderBy: 'newest',
-        modifiedAfter: new Date(2025, 10, 19),
-    })
-    console.log(notes.map(x => x.toString()))
+// Notes
+// const notes = await db.getNotes({
+//     limit: 50,
+//     orderBy: 'newest',
+//     modifiedAfter: new Date(2025, 10, 19),
+// })
+// console.log(notes.map(x => x.toString()))
 
-    // Get structured information from a note
-    let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
-    invariant(note)
-    console.log(await note.getTags())
-    const frontMatter: { baz: number } = note.frontMatter as any
-    note.h1 += '!'
-    frontMatter.baz += 1
-    note.save()
-    // note.append("\n" + randomUUID())
+// Get structured information from a note
+// let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
+// invariant(note)
+// console.log(await note.getTags())
+// const frontMatter: { baz: number } = note.frontMatter as any
+// note.h1 += '!'
+// frontMatter.baz += 1
+// note.save()
+// note.append("\n" + randomUUID())
 
-    // Create a note
-    // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
-    //     "This is better",
-    //     "This is the content I always wished I could have.",
-    //     ['home'],
-    //     { foo: "bar", baz: 321 }
-    // ))
-    // console.log(newNote.toString())
+// Create a note
+// const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
+//     "This is better",
+//     "This is the content I always wished I could have.",
+//     ['home'],
+//     { foo: "bar", baz: 321 }
+// ))
+// console.log(newNote.toString())
 
-    await db.close()
-    return "done"
-})().then(console.log)
+//     await db.close()
+//     return "done"
+// })().then(console.log)
