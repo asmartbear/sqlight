@@ -188,8 +188,8 @@ export class BearSqlNote {
             }
         }
 
-        // Remove tags if they're there
-        this.body = this.body.replaceAll(/^#[\w\/-]+(?:\n|$)/mg, '').trim()
+        // Remove body tags if they're there
+        this.body = this.body.replaceAll(/^#[a-zA-Z][\w\/-]+(?:\n|$)/mg, '').trim()
     }
 
     /** The database-unique primary key of this note */
@@ -241,6 +241,18 @@ export class BearSqlNote {
         return `${this.pk}/${this.uniqueId}${this.isActive ? '' : '[inactive]'}${this.isInConflict ? '!!!' : ''}${this.hasAttachments ? '+++' : ''}: ${this.title} on ${this.modifiedOn}`
     }
 
+    /** Loads the list of tags associated with this note in the database */
+    async getTags(): Promise<Set<string>> {
+        const start = this.database.select()
+        const map = start.from('m', 'Z_5TAGS').col
+        const tags = start.from('t', 'ZSFNOTETAG', 'JOIN', t => t.col.Z_PK.eq(map.Z_13TAGS)).col
+        const q = start
+            .select('name', tags.ZTITLE)
+            .where(map.Z_5NOTES.eq(this.pk))
+        const rows = await this.database.selectAll(q)
+        return new Set(rows.map(r => r.name))
+    }
+
     /** Loads list of note-attachments from the database, but only if they have been downloaded locally. */
     async getAttachments(): Promise<BearSqlAttachment[]> {
         if (!this.hasAttachments) return []          // only if there are any
@@ -255,13 +267,14 @@ export class BearSqlNote {
             .where(att.ZNOTE.eq(this.row.Z_PK))
             .where(att.ZPERMANENTLYDELETED.not())
             .where(att.ZDOWNLOADED)
-        const result = await this.database.selectAll(q)
-        return result.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
+        const rows = await this.database.selectAll(q)
+        return rows.map(row => new BearSqlAttachment(this.database.shinyFrogApplicationDataPath, row))
     }
 
     /** If you've modified body, H1, or front-matter, saves that back to Bear in the background. */
-    save() {
-        this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, undefined, this.frontMatter), 'replace_all')
+    async save(): Promise<void> {
+        const tags = await this.getTags()
+        this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, Array.from(tags), this.frontMatter), 'replace_all')
     }
 
     /** Appends content to a note, in memory and in Bear.  No other changes will be saved! */
@@ -517,10 +530,11 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     // Get structured information from a note
     let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
     invariant(note)
+    console.log(await note.getTags())
     const frontMatter: { baz: number } = note.frontMatter as any
-    // note.h1 += '!'
-    // frontMatter.baz += 1
-    // note.save()
+    note.h1 += '!'
+    frontMatter.baz += 1
+    note.save()
     // note.append("\n" + randomUUID())
 
     // Create a note
