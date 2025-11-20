@@ -400,8 +400,15 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         super(BearSchema, BearSqlDatabase.SHINY_FROG_APPLICATION_DATA_PATH.join(`/database.sqlite`))
     }
 
-    /** Global singleton, to ensure global mutex on the database.  Database is not opened unless accessed, so this is efficient. */
-    static singleton = new BearSqlDatabase()
+    private static _singleton: BearSqlDatabase | null = null
+
+    /** Global singleton, to ensure global mutex on the database.  Database is not opened unless accessed. */
+    static singleton(): BearSqlDatabase {
+        if (!BearSqlDatabase._singleton) {
+            BearSqlDatabase._singleton = new BearSqlDatabase()
+        }
+        return BearSqlDatabase._singleton
+    }
 
     /**
      * Creates a new generic Bear note.
