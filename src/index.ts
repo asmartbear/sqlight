@@ -1,5 +1,5 @@
 export * from './types'
 export * from './expr'
-export { SCHEMA } from './schema'
+export { SCHEMA, SqlJoinType, SqlSelect } from './schema'
 export { SqlightDatabase } from './db'
-export { BearDatabase } from './bear'
+export * from './bear'
