@@ -333,8 +333,8 @@ export class BearSqlNote {
             text: content,
             mode: mode,
             show_window: "no",
+            open_note: "no",
         })
-        this.row.ZTEXT = content
     }
 
     /** Opens this note in the Bear application */
