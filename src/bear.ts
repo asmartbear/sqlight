@@ -559,7 +559,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         const { select, notes } = this.getNoteSelect(options)
         const q = select
             .select('uid', notes.ZUNIQUEIDENTIFIER)
-        return (await this.selectAll(q)).map(row => row.uid)
+        return this.selectCol(q, "uid")
     }
 }
 

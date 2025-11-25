@@ -5,7 +5,7 @@ import { Mutex } from 'async-mutex';
 import { Path } from '@asmartbear/filesystem';
 
 import { SchemaTable } from './types'
-import { SqlSchema, SqlSelect, NativeSelectRow } from './schema'
+import { SqlSchema, SqlSelect, NativeSelectRow, SelectKeys } from './schema'
 
 
 /** The live connection to a database.  Mutexes access, since Sqlite doesn't allow multi-threaded access. */
@@ -62,7 +62,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     queryAll<ROW extends Record<string, any>>(sql: string): Promise<ROW[]> {
         return this.mutex.runExclusive(async () => {
             const db = await this.db()
-            return db.all(sql)
+            return await db.all(sql)
         })
     }
 
@@ -70,19 +70,29 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     queryOne<ROW extends Record<string, any>>(sql: string): Promise<ROW | undefined> {
         return this.mutex.runExclusive(async () => {
             const db = await this.db()
-            return db.get<ROW>(sql)
+            return await db.get<ROW>(sql)
         })
     }
 
+    /** Runs an arbitrary query inside the mutex, returning a named column as an array. */
+    async queryCol<COLNAME extends string, V>(sql: string, colName: COLNAME): Promise<V[]> {
+        return (await this.queryAll<Record<COLNAME, V>>(sql)).map(row => row[colName])
+    }
+
     /** Runs a query inside the mutex, loading all rows into memory at once. */
-    selectAll<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<typeof select>[]> {
+    selectAll<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<SELECT>[]> {
         return this.queryAll(select.toSql())
     }
 
     /** Runs a query inside the mutex, returning the first row or `undefined` if no rows. */
-    selectOne<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<typeof select> | undefined> {
+    selectOne<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<SELECT> | undefined> {
         // Limits to 1, since we're selecting only one!
         return this.queryOne(select.setLimit(1).toSql())
+    }
+
+    /** Runs a query inside the mutex, returning the data of the named column as an array. */
+    selectCol<SELECT extends SqlSelect<TABLES>, COLNAME extends SelectKeys<SELECT>>(select: SELECT, colName: COLNAME): Promise<NativeSelectRow<SELECT>[COLNAME][]> {
+        return this.queryCol(select.toSql(), colName)
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */

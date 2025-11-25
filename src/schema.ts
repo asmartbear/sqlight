@@ -86,6 +86,9 @@ type OrderBy = {
 /** Extracts the native row type for a select statement. */
 export type NativeSelectRow<S> = S extends SqlSelect<any, infer NATIVEROW> ? Flatten<NATIVEROW> : never;
 
+/** The strings of the select columns */
+export type SelectKeys<S> = keyof NativeSelectRow<S> & string;
+
 /** A SQL select expression. */
 export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW extends Record<string, any> = {}> {
 
@@ -103,7 +106,7 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
     }
 
     /** Returns a SQL expression that is the result of running this query, selecting just the column in question */
-    asSubquery<TALIAS extends string>(alias: TALIAS): SqlExpression<SqlTypeFor<NATIVEROW[TALIAS]>> {
+    asSubquery<TALIAS extends SelectKeys<this>>(alias: TALIAS): SqlExpression<SqlTypeFor<NATIVEROW[TALIAS]>> {
         const expr = this.selectSql.get(alias)
         invariant(expr)
         return new SqlSubquery(expr.type, '(' + this.toSql() + ')') as any
