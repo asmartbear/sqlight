@@ -52,13 +52,13 @@ test('SELECT with single FROM', () => {
     const id = u.col.id
     T.be(id.columnName, "id")
     T.be(id.type, "INTEGER")
-    T.be(id.canBeNull(), false)
+    T.be(id.canBeNull, false)
     T.be(id.toSql(), "u.id")
 
     const apiKey = u.col.apiKey
     T.be(apiKey.columnName, "apiKey")
     T.be(apiKey.type, "TEXT")
-    T.be(apiKey.canBeNull(), true)
+    T.be(apiKey.canBeNull, true)
     T.be(apiKey.toSql(), "u.apiKey")
 
     select.select('myId', u.col.id)
@@ -82,10 +82,10 @@ test('WHERE x IN (subquery)', () => {
     const subselect = testSchema.select().select('id', EXPR(123))
     T.be(subselect.toSql(), "SELECT 123 AS id")
     const sub = subselect.asSubquery('id')
-    T.be(sub.canBeNull(), true)
+    T.be(sub.canBeNull, true)
     const select = testSchema.select().select('title', EXPR('hi'))
     const inSub = EXPR(456).inSubquery(sub)
-    T.be(inSub.canBeNull(), false)
+    T.be(inSub.canBeNull, false)
     T.be(inSub.toSql(false), "456 IN (SELECT 123 AS id)")
     T.be(inSub.toSql(true), "(456 IN (SELECT 123 AS id))")
     select.where(inSub)

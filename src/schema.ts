@@ -60,10 +60,8 @@ class SqlColumn<
         public readonly columnName: COLNAME,
         public readonly column: COLUMN,
     ) {
-        super(column.type)
+        super(column.type, column.nullable === true)
     }
-
-    canBeNull(): boolean { return !!this.column.nullable }
 
     toSql() { return `${this.tableAlias}.${this.columnName}` }
 }
@@ -217,7 +215,6 @@ class SqlSubquery<D extends SqlType> extends SqlExpression<D> {
     constructor(
         type: D,
         private readonly sql: string,
-    ) { super(type) }
-    canBeNull(): boolean { return true }
+    ) { super(type, true) }
     toSql() { return this.sql }
 }

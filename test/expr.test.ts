@@ -5,42 +5,42 @@ test('integers from INT', () => {
     const n = S.INT(123)
     T.be(n.type, "INTEGER")
     T.be(n.toSql(), "123")
-    T.be(n.canBeNull(), false)
+    T.be(n.canBeNull, false)
 })
 
 test('integers from EXPR', () => {
     const n = S.EXPR(123)
     T.be(n.type, "INTEGER")
     T.be(n.toSql(), "123")
-    T.be(n.canBeNull(), false)
+    T.be(n.canBeNull, false)
 })
 
 test('reals from FLOAT', () => {
     const n = S.FLOAT(1.23)
     T.be(n.type, "REAL")
     T.be(n.toSql(), "1.23")
-    T.be(n.canBeNull(), false)
+    T.be(n.canBeNull, false)
 })
 
 test('reals from EXPR', () => {
     const n = S.EXPR(1.23)
     T.be(n.type, "REAL")
     T.be(n.toSql(), "1.23")
-    T.be(n.canBeNull(), false)
+    T.be(n.canBeNull, false)
 })
 
 test('strings', () => {
     const s = S.EXPR("foo")
     T.be(s.type, "TEXT")
     T.be(s.toSql(), "'foo'")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('booleans', () => {
     const s = S.EXPR(true)
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(), "TRUE")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
     T.be(S.EXPR(false).toSql(), "FALSE")
 })
 
@@ -48,14 +48,14 @@ test('dates', () => {
     const s = S.EXPR(new Date(1234567890123))
     T.be(s.type, "TIMESTAMP")
     T.be(s.toSql(), "2009-02-13T23:31:30.123Z")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('blobs', () => {
     const s = S.EXPR(Buffer.from("hello", "utf8"))
     T.be(s.type, "BLOB")
     T.be(s.toSql(), "x'68656c6c6f'")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('invalid literal', () => {
@@ -84,37 +84,37 @@ test('comparisons', () => {
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo'='bar'")
     T.be(s.toSql(true), "('foo'='bar')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR("foo").ne("bar")
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo'!='bar'")
     T.be(s.toSql(true), "('foo'!='bar')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR("foo").lt("bar")
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo'<'bar'")
     T.be(s.toSql(true), "('foo'<'bar')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR("foo").le("bar")
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo'<='bar'")
     T.be(s.toSql(true), "('foo'<='bar')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR(321).gt(123)
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "321>123")
     T.be(s.toSql(true), "(321>123)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR(321).ge(123)
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "321>=123")
     T.be(s.toSql(true), "(321>=123)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('add/sub/mul', () => {
@@ -129,25 +129,25 @@ test('add/sub/mul', () => {
         T.be(s.type, "INTEGER")
         T.be(s.toSql(false), `123${op.op}456`)
         T.be(s.toSql(true), `(123${op.op}456)`)
-        T.be(s.canBeNull(), false)
+        T.be(s.canBeNull, false)
 
         s = op.f(123, 4.56)
         T.be(s.type, "REAL")
         T.be(s.toSql(false), `123${op.op}4.56`)
         T.be(s.toSql(true), `(123${op.op}4.56)`)
-        T.be(s.canBeNull(), false)
+        T.be(s.canBeNull, false)
 
         s = op.f(1.23, 456)
         T.be(s.type, "REAL")
         T.be(s.toSql(false), `1.23${op.op}456`)
         T.be(s.toSql(true), `(1.23${op.op}456)`)
-        T.be(s.canBeNull(), false)
+        T.be(s.canBeNull, false)
 
         s = op.f(1.23, 4.56)
         T.be(s.type, "REAL")
         T.be(s.toSql(false), `1.23${op.op}4.56`)
         T.be(s.toSql(true), `(1.23${op.op}4.56)`)
-        T.be(s.canBeNull(), false)
+        T.be(s.canBeNull, false)
     }
 })
 
@@ -157,25 +157,25 @@ test('div', () => {
     T.be(s.type, "REAL")
     T.be(s.toSql(false), "123/456")
     T.be(s.toSql(true), "(123/456)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR(123).div(4.56)
     T.be(s.type, "REAL")
     T.be(s.toSql(false), "123/4.56")
     T.be(s.toSql(true), "(123/4.56)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR(1.23).div(456)
     T.be(s.type, "REAL")
     T.be(s.toSql(false), "1.23/456")
     T.be(s.toSql(true), "(1.23/456)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     s = S.EXPR(1.23).div(4.56)
     T.be(s.type, "REAL")
     T.be(s.toSql(false), "1.23/4.56")
     T.be(s.toSql(true), "(1.23/4.56)")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('not', () => {
@@ -183,7 +183,7 @@ test('not', () => {
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "NOT (FALSE)")
     T.be(s.toSql(true), "(NOT (FALSE))")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('is null', () => {
@@ -191,7 +191,7 @@ test('is null', () => {
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo' IS NULL")
     T.be(s.toSql(true), "'foo' IS NULL")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('is not null', () => {
@@ -199,15 +199,15 @@ test('is not null', () => {
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), "'foo' IS NOT NULL")
     T.be(s.toSql(true), "'foo' IS NOT NULL")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('in list', () => {
     const s = S.EXPR("foo").inList(["foo", "bar", "123"])
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "'foo' IN ('foo','bar','123')")
-    T.be(s.toSql(true), "('foo' IN ('foo','bar','123'))")
-    T.be(s.canBeNull(), false)
+    T.be(s.toSql(false), "'foo' IN('foo','bar','123')")
+    T.be(s.toSql(true), "('foo' IN('foo','bar','123'))")
+    T.be(s.canBeNull, false)
 })
 
 test('coalesce', () => {
@@ -215,7 +215,7 @@ test('coalesce', () => {
     T.be(s.type, "TEXT")
     T.be(s.toSql(false), "COALESCE('foo','bar')")
     T.be(s.toSql(true), "COALESCE('foo','bar')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('concat', () => {
@@ -223,7 +223,7 @@ test('concat', () => {
     T.be(s.type, "TEXT")
     T.be(s.toSql(false), "'foo'||'bar'||'baz'")
     T.be(s.toSql(true), "('foo'||'bar'||'baz')")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('and/or (and multi-nary operators generally)', () => {
@@ -237,7 +237,7 @@ test('and/or (and multi-nary operators generally)', () => {
         T.be(s.type, "BOOLEAN")
         T.be(s.toSql(false), `TRUE ${op.op} FALSE`)
         T.be(s.toSql(true), `(TRUE ${op.op} FALSE)`)
-        T.be(s.canBeNull(), false)
+        T.be(s.canBeNull, false)
     }
 
     // Nested
@@ -245,21 +245,21 @@ test('and/or (and multi-nary operators generally)', () => {
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), `(TRUE AND FALSE) OR TRUE OR FALSE`)
     T.be(s.toSql(true), `((TRUE AND FALSE) OR TRUE OR FALSE)`)
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     // Degenerate
     s = S.AND(true)
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), `TRUE`)
     T.be(s.toSql(true), `TRUE`)
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 
     // Degenerate nested
     s = S.AND(S.OR(true, false))
     T.be(s.type, "BOOLEAN")
     T.be(s.toSql(false), `TRUE OR FALSE`)
     T.be(s.toSql(true), `(TRUE OR FALSE)`)
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })
 
 test('case', () => {
@@ -267,11 +267,11 @@ test('case', () => {
     T.be(s.type, "INTEGER")
     T.be(s.toSql(false), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 END")
     T.be(s.toSql(true), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 END")
-    T.be(s.canBeNull(), true, "because there's no ELSE")
+    T.be(s.canBeNull, true, "because there's no ELSE")
 
     s = S.CASE<'INTEGER'>([[S.EXPR('foo').eq('a'), 1], [S.EXPR('foo').eq('b'), 2]], -1)
     T.be(s.type, "INTEGER")
     T.be(s.toSql(false), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 ELSE -1 END")
     T.be(s.toSql(true), "CASE WHEN 'foo'='a' THEN 1 WHEN 'foo'='b' THEN 2 ELSE -1 END")
-    T.be(s.canBeNull(), false)
+    T.be(s.canBeNull, false)
 })

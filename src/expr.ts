@@ -146,6 +146,7 @@ export function CASE<D extends SqlType>(whenList: readonly [SqlExpression<'BOOLE
 export abstract class SqlExpression<D extends SqlType> {
     constructor(
         public readonly type: D,
+        public readonly canBeNull: boolean,
     ) { }
 
     /**
@@ -154,11 +155,6 @@ export abstract class SqlExpression<D extends SqlType> {
      * @param grouped If true, and if this expression is not already atomic, it needs to be enclosed in parentheses.
      */
     abstract toSql(grouped: boolean): string
-
-    /**
-     * True if this expression could potentially be `NULL`.
-     */
-    abstract canBeNull(): boolean
 
     /** Boolean result of asking whether this expression is `NOT NULL` */
     isNotNull(): SqlExpression<'BOOLEAN'> { return new SqlIsNotNull(this) }
@@ -196,8 +192,7 @@ class SqlLiteral<D extends SqlType, T extends NativeFor<D>> extends SqlExpressio
     constructor(
         type: D,
         protected readonly value: T,
-    ) { super(type) }
-    canBeNull(): boolean { return false }
+    ) { super(type, false) }
     toSql() { return String(this.value) }
 }
 
@@ -222,14 +217,12 @@ class SqlBufferLiteral extends SqlLiteral<'BLOB', Buffer> {
 }
 
 class SqlIsNull extends SqlExpression<'BOOLEAN'> {
-    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN') }
-    canBeNull(): boolean { return false }
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', false) }
     toSql() { return `${this.ex.toSql(true)} IS NULL` }
 }
 
 class SqlIsNotNull extends SqlExpression<'BOOLEAN'> {
-    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN') }
-    canBeNull(): boolean { return false }
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', false) }
     toSql() { return `${this.ex.toSql(true)} IS NOT NULL` }
 }
 
@@ -240,11 +233,7 @@ class SqlUnaryOperator<D extends SqlType> extends SqlExpression<D> {
         private readonly prefix: string,
         private readonly x: SqlExpression<SqlType>,
         private readonly suffix: string,
-    ) { super(type) }
-
-    canBeNull(): boolean {
-        return this.x.canBeNull()
-    }
+    ) { super(type, x.canBeNull) }
 
     toSql(grouped: boolean) {
         let sql = this.prefix + this.x.toSql(false) + this.suffix
@@ -259,11 +248,8 @@ class SqlMultiOperator<INTYPE extends SqlType, OUTTYPE extends SqlType> extends 
         type: OUTTYPE,
         protected readonly op: string,
         protected readonly list: readonly SqlExpression<INTYPE>[],
-    ) { super(type) }
-
-    canBeNull(): boolean {
-        return !this.list.every(s => !s.canBeNull())
-    }
+        canBeNullOverride?: boolean,     // normally we inherit from the list, but this can override it
+    ) { super(type, canBeNullOverride ?? !list.every(s => !s.canBeNull)) }
 
     toSql(grouped: boolean) {
         const groupInner = grouped || this.list.length > 1
@@ -276,8 +262,9 @@ class SqlMultiOperator<INTYPE extends SqlType, OUTTYPE extends SqlType> extends 
 
 /** Like a multi-operator but is represented like a function. */
 export class SqlMultiFunction<INTYPE extends SqlType, OUTTYPE extends SqlType> extends SqlMultiOperator<INTYPE, OUTTYPE> {
-    constructor(type: OUTTYPE, op: string, list: readonly SqlExpression<INTYPE>[]
-    ) { super(type, op, list) }
+    constructor(type: OUTTYPE, op: string, list: readonly SqlExpression<INTYPE>[],
+        canBeNullOverride?: boolean,     // normally we inherit from the list, but this can override it
+    ) { super(type, op, list, canBeNullOverride) }
 
     toSql(grouped: boolean) {
         return this.op + '(' + this.list.map(e => e.toSql(false)).join(',') + ')'
@@ -293,26 +280,18 @@ class SqlBinaryArithmeticOperator<LHS extends 'INTEGER' | 'REAL', RHS extends 'I
 
 class SqlCoalesce<D extends SqlType> extends SqlMultiFunction<D, D> {
     constructor(list: readonly SqlExpression<D>[]) {
-        super(list[0].type, 'COALESCE', list)
-    }
-
-    canBeNull(): boolean {
-        // If any of the items are never null, then we can't be null either.
-        // Otherwise, we could be, since all of them could simultaneously be.
-        return this.list.every(s => s.canBeNull())
+        super(list[0].type, 'COALESCE', list, list.every(s => s.canBeNull))
     }
 }
 
-class SqlInList<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
+class SqlInList<D extends SqlType> extends SqlMultiFunction<D, 'BOOLEAN'> {
     constructor(
         private readonly ex: SqlExpression<D>,
-        private readonly list: readonly SqlExpression<D>[],
-    ) { super('BOOLEAN') }
-
-    canBeNull(): boolean { return false }
+        list: readonly SqlExpression<D>[],
+    ) { super('BOOLEAN', 'IN', list, false) }
 
     toSql(grouped: boolean) {
-        let sql = `${this.ex.toSql(true)} IN (${this.list.map(e => e.toSql(true)).join(',')})`
+        let sql = `${this.ex.toSql(true)} ` + super.toSql(false)
         if (grouped) sql = '(' + sql + ')'
         return sql
     }
@@ -322,9 +301,7 @@ class SqlInSubquery<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
     constructor(
         private readonly ex: SqlExpression<D>,
         private readonly subquery: SqlExpression<D>,
-    ) { super('BOOLEAN') }
-
-    canBeNull(): boolean { return false }
+    ) { super('BOOLEAN', false) }
 
     toSql(grouped: boolean) {
         let sql = `${this.ex.toSql(true)} IN ${this.subquery.toSql(true)}`
@@ -341,19 +318,17 @@ class SqlCase<D extends SqlType> extends SqlExpression<D> {
         private readonly whenList: readonly [SqlExpression<'BOOLEAN'>, SqlExpression<D>][],
         private readonly elseExpr?: SqlExpression<D>
     ) {
+        // Collect all value-types
         const allValues = whenList.map(pair => pair[1])
         if (elseExpr) {
             allValues.push(elseExpr)
         }
         const type = TYPE(allValues)
+        // Lack of ELSE specifically returns NULL
+        const canBeNull = (!elseExpr) ? true : !allValues.every(s => !s.canBeNull)
         invariant(type, "what?")
-        super(type)
+        super(type, canBeNull)
         this.allValues = allValues
-    }
-
-    canBeNull(): boolean {
-        if (!this.elseExpr) return true     // because lack of ELSE specifically returns NULL
-        return !this.allValues.every(s => !s.canBeNull())
     }
 
     toSql() {
