@@ -525,7 +525,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             .passThrough(notes.ZCONFLICTUNIQUEIDENTIFIER)
             .passThrough(notes.ZCREATIONDATE)
             .passThrough(notes.ZMODIFICATIONDATE)
-            .passThrough(notes.ZMODIFICATIONDATE)
             .select('isActive', isActive)
             .select('hasAttachments', notes.ZHASFILES.or(notes.ZHASIMAGES))
 
