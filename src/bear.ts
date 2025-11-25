@@ -33,7 +33,7 @@ function bearXCall(cmd: string, args?: Record<string, string>) {
         urlArgs = '?' + argList.map(pair => `${betterEncodeUriComponent(pair[0])}=${betterEncodeUriComponent(pair[1])}`).join('&')
     }
     const url = `bear://x-callback-url/${cmd}${urlArgs}`
-    exec(`open '${url}'`)
+    exec(`open -g '${url}'`)
 }
 
 function openCmd(path: string) {
@@ -301,6 +301,47 @@ export class BearSqlNote {
     }
 
     /**
+     * Adds content as a file attachment to a note. Finishes in the background.
+     * 
+     * @param content string or raw buffer to upload as an attachment
+     * @param filename filename to use inside Bear
+     */
+    async appendFile(content: string | Buffer, filename: string): Promise<void>;
+
+    /**
+     * Adds a filesystem file as an attachment to a note. Finishes in the background.
+     * 
+     * @param path path to the file content to upload
+     * @param filename optional filename to use inside Bear; if not given, uses the file's natural name.
+     */
+    async appendFile(path: Path, filename?: string): Promise<void>;
+
+    async appendFile(pathOrContent: Path | string | Buffer, filename?: string): Promise<void> {
+
+        // Validate filename, first taking from defaults where possible.
+        if (!filename && pathOrContent instanceof Path) {
+            filename = pathOrContent.filename
+        }
+        if (!filename) throw new Error('BearSqlNote.appendFile() requires filename when not using a path to a file on disk.')
+
+        // Extract Base64 file contents depending on inputs
+        const file: string =
+            (pathOrContent instanceof Path) ? (await pathOrContent.readAsString('base64')) :
+                (typeof pathOrContent === "string") ? Buffer.from(pathOrContent, 'utf-8').toString('base64') :
+                    pathOrContent.toString('base64')
+
+        // Create bear note with the screenshot and the URL
+        // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-file
+        bearXCall('add-file', {
+            id: this.uniqueId,
+            open_note: "no",
+            show_window: "no",
+            mode: "append",
+            filename, file,
+        })
+    }
+
+    /**
      * Computes complete Bear note content given inputs in pieces.
      * 
      * Implemented as a public static method for unit-testing.
@@ -330,10 +371,10 @@ export class BearSqlNote {
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#add-text
         bearXCall("add-text", {
             id: this.uniqueId,
-            text: content,
             mode: mode,
             show_window: "no",
             open_note: "no",
+            text: content,
         })
     }
 
@@ -566,14 +607,18 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 //     const db = BearSqlDatabase.singleton()
 //     // console.log(await db.getTables())
 
-//     //     // Notes
+//     // Notes
 //     const filter: BearNoteQueryOptions = {
 //         limit: 10,
 //         orderBy: 'newest',
 //         modifiedAfter: new Date(2025, 10, 19),
 //     }
 //     const notes = await db.getNotes(filter)
+//     console.log(notes.map(String))
 //     console.log(await Promise.all(notes.map(x => x.getTags())))
+
+//     await notes[0].appendFile(Path.userHomeDir.join("Downloads", "skate.pdf"))
+//     await notes[0].appendFile("tacos are good", "tacos.txt")
 
 // console.log(await db.getNoteUniqueIDs(filter))
 
