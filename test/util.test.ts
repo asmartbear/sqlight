@@ -1,4 +1,4 @@
-import * as T from "./testutil"
+import * as T from "@asmartbear/testutil"
 import * as U from "../src/util"
 
 test('integers from INT', () => {

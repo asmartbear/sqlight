@@ -1,5 +1,4 @@
-import * as T from "./testutil"
-import { SchemaDatabase } from "../src/types"
+import * as T from "@asmartbear/testutil"
 import { CONCAT, EXPR } from "../src/expr"
 import { SCHEMA } from "../src/schema"
 
