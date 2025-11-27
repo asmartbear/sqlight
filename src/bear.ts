@@ -1,6 +1,8 @@
 import { exec } from 'child_process';
 import { randomUUID } from 'crypto';
 
+import * as D from '@asmartbear/dyn'
+
 import { SCHEMA, SqlJoinType, SqlSelect, TablesOf } from './schema'
 import { SqlightDatabase } from './db'
 import { OR } from './expr'
@@ -263,7 +265,7 @@ export class BearSqlNote {
             .select('name', tags.ZTITLE)
             .where(map.Z_5NOTES.eq(this.pk))
         const rows = await this.database.selectAll(q)
-        const tagList = rows.map(row => row.name)
+        const tagList = D.MAP(rows, row => row.name ?? undefined)       // XXXX: fix when NULLs are native
         return new Set(removeParentTags(tagList))
     }
 
@@ -283,7 +285,7 @@ export class BearSqlNote {
             .where(att.ZPERMANENTLYDELETED.not())
             .where(att.ZDOWNLOADED)
         const rows = await this.database.selectAll(q)
-        return rows.map(row => new BearSqlAttachment(row))
+        return rows.map(row => new BearSqlAttachment(row as any))       // XXXX: fix when NULLs are native
     }
 
     /**
@@ -567,7 +569,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         const q = shell
             .select('id', tags.col.Z_PK)
             .select('name', tags.col.ZTITLE)
-        return this.selectAll(q)
+        return this.selectAll(q) as any       // XXXX: fix when NULLs are native
     }
 
     /**
@@ -658,7 +660,7 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         )
 
         // Wrap the results in bear objects
-        return rows.map(r => new BearSqlNote(this, r))
+        return rows.map(r => new BearSqlNote(this, r as any))       // XXXX: fix when NULLs are native
     }
 
     /** 
@@ -685,6 +687,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         const { select, notes } = this.getNoteSelect(options)
         const q = select
             .select('uid', notes.ZUNIQUEIDENTIFIER)
-        return this.selectCol(q, 'uid')
+        return D.MAP(await this.selectCol(q, 'uid'), x => x ?? undefined)       // XXXX: fix when NULLs are native
     }
 }
