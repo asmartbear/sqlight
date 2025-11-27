@@ -30,16 +30,14 @@ import { randomUUID } from "crypto"
     //     }
 
     // Get structured information from a note
-    // let note = await db.getNoteByUniqueId('E9FB660C-5554-4B43-8909-EC75C2A75792')
-    // invariant(note)
-    // const since = new Date()
-    // console.log(await note.getTags())
-    // const frontMatter: { baz: number } = note.frontMatter as any
-    // note.h1 += '!'
-    // frontMatter.baz += 1
-    // await note.save()
-    // note = await note.refresh(since)
-    // note.append("\n" + randomUUID())
+    let note = await db.getNoteByUniqueId('E9FB660C-5554-4B43-8909-EC75C2A75792')
+    invariant(note)
+    console.log(await note.getTags())
+    const frontMatter: { baz: number } = note.frontMatter as any
+    note.h1 += '!'
+    frontMatter.baz += 1
+    note = await note.save(true)
+    note.append("\n" + randomUUID())
 
     // Create a note
     // const note = await db.createNote(['home'])

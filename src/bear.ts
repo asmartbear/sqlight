@@ -286,11 +286,18 @@ export class BearSqlNote {
         return rows.map(row => new BearSqlAttachment(row))
     }
 
-    /** If you've modified body, H1, or front-matter, saves that back to Bear in the background. */
-    async save(): Promise<void> {
+    /**
+     * If you've modified body, H1, or front-matter, saves that back to Bear in the background.
+     * 
+     * @param withRefresh (default false) if true, waits for this change to hit the database, then re-reads the entire note and returns the result
+     * @returns this object for chaining, or a new object if a refresh was also requested
+     */
+    async save(withRefresh: boolean = false): Promise<BearSqlNote> {
         if (!this.database) throw new Error("BearSqlNote.save() requires a live database.")
+        const since = withRefresh ? new Date() : undefined
         const tags = await this.getTags()
         this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, Array.from(tags), this.frontMatter), 'replace_all')
+        return since ? this.refresh(since) : this
     }
 
     /**
