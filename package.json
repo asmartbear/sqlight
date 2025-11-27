@@ -1,6 +1,6 @@
 {
   "name": "@asmartbear/sqlight",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Typescript-safe SQL builder for SQLite",
   "keywords": [
     "sqlite"
