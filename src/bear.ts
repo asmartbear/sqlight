@@ -33,7 +33,6 @@ function bearXCall(cmd: string, args?: Record<string, string>) {
         urlArgs = '?' + argList.map(pair => `${betterEncodeUriComponent(pair[0])}=${betterEncodeUriComponent(pair[1])}`).join('&')
     }
     const url = `bear://x-callback-url/${cmd}${urlArgs}`
-    console.log(url)
     exec(`open -g '${url}'`)
 }
 
@@ -456,12 +455,12 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     }
 
     /**
-     * Creates a new generic Bear note.
+     * Creates a new generic Bear note from complete raw content, but without a handle or ID to reference it.
      * 
      * @param content The raw content of the note; recommmend using `BearSqlNote.createStructuredContent()` to produce this.
      * @param openNewNote If true, physically opens the note in the Bear app
      */
-    static createNote(content: string, openNewNote: boolean) {
+    static createNoteByContent(content: string, openNewNote: boolean) {
         bearXCall("create", {
             text: content,
             open_note: openNewNote ? "yes" : "no",
@@ -471,6 +470,22 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         if (openNewNote) {
             openCmd('/Applications/Bear.app')
         }
+    }
+
+    /**
+     * Creates a nearly-blank note object, waits for it to be available in the database, and returns
+     * the live note object.  You can set things like title, content, and YAML header, and then save it.
+     * 
+     * @param tags optional list of tags to use in the note
+     */
+    async createNote(tags?: string[]): Promise<BearSqlNote> {
+        // Create a note with bogus, uniquely identifiable content
+        const tempTitle = `New note ${randomUUID()}`
+        const tagStr = tags ? tags.map(t => `#${t}\n`).join('') : ''
+        BearSqlDatabase.createNoteByContent(`# ${tempTitle}\n\n${tagStr}`, false)
+        // Wait for it to appear
+        const note = await busyWait(100, () => this.getNoteByTitle(tempTitle))
+        return note
     }
 
     /**
@@ -497,21 +512,6 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         if (options.openAppWindow) {
             openCmd('/Applications/Bear.app')
         }
-    }
-
-    /**
-     * Creates a new note with the given content, then waits for it to appear in the database,
-     * then returns the database record.  This allows you to know things like its unique ID.
-     */
-    async createAndReturnNote(content: string): Promise<BearSqlNote> {
-        // Create a note with bogus, uniquely identifiable content
-        const tempTitle = `New note ${randomUUID()}`
-        BearSqlDatabase.createNote(`# ${tempTitle}\n\n`, false)
-        // Wait for it to appear
-        const note = await busyWait(100, () => this.getNoteByTitle(tempTitle))
-        // Replace its content with the right content
-        note.setRawContent(content, 'replace_all')
-        return note
     }
 
     /** Retrieves all tags in the system */
@@ -673,13 +673,11 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
 // note.append("\n" + randomUUID())
 
 // Create a note
-// const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
-//     "This is better",
-//     "This is the content I always wished I could have.",
-//     ['home'],
-//     { foo: "bar", baz: 321 }
-// ))
-// console.log(newNote.toString())
+// const note = await db.createNote(['home'])
+// note.h1 = 'Made in test'
+// note.body = 'Something is here now!'
+// note.frontMatter.foo = 123
+// await note.save()
 
 //     await db.close()
 //     return "done"
