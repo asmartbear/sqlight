@@ -176,6 +176,8 @@ test('div', () => {
     T.be(s.toSql(false), "1.23/4.56")
     T.be(s.toSql(true), "(1.23/4.56)")
     T.be(s.canBeNull, false)
+
+    T.throws(() => S.EXPR("foo").div(123), undefined, "lhs must be numeric")
 })
 
 test('not', () => {
@@ -224,6 +226,15 @@ test('concat', () => {
     T.be(s.toSql(false), "'foo'||'bar'||'baz'")
     T.be(s.toSql(true), "('foo'||'bar'||'baz')")
     T.be(s.canBeNull, false)
+})
+
+test('includes', () => {
+    let s = S.EXPR("foobar").includes("bar")
+    T.be(s.type, "BOOLEAN")
+    T.be(s.toSql(false), "INSTR('foobar','bar')")
+    T.be(s.toSql(true), "INSTR('foobar','bar')")
+    T.be(s.canBeNull, false)
+    T.throws(() => S.EXPR(123).includes("bar"), undefined, "lhs must be a string")
 })
 
 test('and/or (and multi-nary operators generally)', () => {

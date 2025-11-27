@@ -33,6 +33,7 @@ function bearXCall(cmd: string, args?: Record<string, string>) {
         urlArgs = '?' + argList.map(pair => `${betterEncodeUriComponent(pair[0])}=${betterEncodeUriComponent(pair[1])}`).join('&')
     }
     const url = `bear://x-callback-url/${cmd}${urlArgs}`
+    console.log(url)
     exec(`open -g '${url}'`)
 }
 
@@ -417,6 +418,8 @@ export type BearNoteQueryOptions = {
     tagsExclude?: string[]
     /** Only notes with modification dates newer than this */
     modifiedAfter?: Date
+    /** Only notes that contain a specific substring */
+    includes?: string
     /** How to order the returned notes. */
     orderBy?: 'newest' | 'oldest'
     /** Normally inactive notes are ignored, but you can include them. */
@@ -466,6 +469,32 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             new_window: openNewNote ? "yes" : "no",
         })
         if (openNewNote) {
+            openCmd('/Applications/Bear.app')
+        }
+    }
+
+    /**
+     * Selects a set of notes in the Bear App window, optionally based on things like search string or tag.
+     */
+    static openNoteListInBear(options: {
+        /** search string to filter results */
+        q?: string,
+        /** tag to display; also scopes the search string */
+        tag?: string,
+        /** if true, also bring the Bear app to the foreground */
+        openAppWindow?: boolean,
+    }): void {
+        const qargs: Record<string, string> = {
+            show_window: options.openAppWindow ? "yes" : "no",
+        }
+        if (options.q) {
+            qargs.term = options.q
+        }
+        if (options.tag) {
+            qargs.tag = options.tag
+        }
+        bearXCall("search", qargs)
+        if (options.openAppWindow) {
             openCmd('/Applications/Bear.app')
         }
     }
@@ -523,6 +552,9 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         }
         if (options.modifiedAfter) {
             q.where(notes.ZMODIFICATIONDATE.gt(dateToBearTimestamp(options.modifiedAfter)))
+        }
+        if (options.includes) {
+            q.where(notes.ZTEXT.includes(options.includes))
         }
 
         // Apply tags
@@ -603,51 +635,52 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
     }
 }
 
-// (async () => {
-//     const db = BearSqlDatabase.singleton()
-//     // console.log(await db.getTables())
+(async () => {
+    const db = BearSqlDatabase.singleton()
+    //     // console.log(await db.getTables())
 
-//     // Notes
-//     const filter: BearNoteQueryOptions = {
-//         limit: 10,
-//         orderBy: 'newest',
-//         modifiedAfter: new Date(2025, 10, 19),
-//     }
-//     const notes = await db.getNotes(filter)
-//     console.log(notes.map(String))
-//     console.log(await Promise.all(notes.map(x => x.getTags())))
+    // Notes
+    const filter: BearNoteQueryOptions = {
+        limit: 10,
+        includes: "Jira",
+        orderBy: 'newest',
+        // modifiedAfter: new Date(2025, 10, 19),
+    }
+    const notes = await db.getNotes(filter)
+    console.log(notes.map(String))
+    // console.log(await Promise.all(notes.map(x => x.getTags())))
 
-//     await notes[0].appendFile(Path.userHomeDir.join("Downloads", "skate.pdf"))
-//     await notes[0].appendFile("tacos are good", "tacos.txt")
+    //     await notes[0].appendFile(Path.userHomeDir.join("Downloads", "skate.pdf"))
+    //     await notes[0].appendFile("tacos are good", "tacos.txt")
 
-// console.log(await db.getNoteUniqueIDs(filter))
+    // console.log(await db.getNoteUniqueIDs(filter))
 
-//     // Attachments
-//     for (const note of notes) {
-//         for (const att of await note.getAttachments()) {
-//             console.log(att.toString())
-//         }
-//     }
+    //     // Attachments
+    //     for (const note of notes) {
+    //         for (const att of await note.getAttachments()) {
+    //             console.log(att.toString())
+    //         }
+    //     }
 
-// Get structured information from a note
-// let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
-// invariant(note)
-// console.log(await note.getTags())
-// const frontMatter: { baz: number } = note.frontMatter as any
-// note.h1 += '!'
-// frontMatter.baz += 1
-// note.save()
-// note.append("\n" + randomUUID())
+    // Get structured information from a note
+    // let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
+    // invariant(note)
+    // console.log(await note.getTags())
+    // const frontMatter: { baz: number } = note.frontMatter as any
+    // note.h1 += '!'
+    // frontMatter.baz += 1
+    // note.save()
+    // note.append("\n" + randomUUID())
 
-// Create a note
-// const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
-//     "This is better",
-//     "This is the content I always wished I could have.",
-//     ['home'],
-//     { foo: "bar", baz: 321 }
-// ))
-// console.log(newNote.toString())
+    // Create a note
+    // const newNote = await db.createAndReturnNote(BearSqlNote.createStructuredContent(
+    //     "This is better",
+    //     "This is the content I always wished I could have.",
+    //     ['home'],
+    //     { foo: "bar", baz: 321 }
+    // ))
+    // console.log(newNote.toString())
 
-//     await db.close()
-//     return "done"
-// })().then(console.log)
+    //     await db.close()
+    return "done"
+})().then(console.log)

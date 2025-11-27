@@ -86,7 +86,8 @@
     "coveragePathIgnorePatterns": [
       "/node_modules/",
       "/dist/",
-      "/test/"
+      "/test/",
+      "/src/util.ts"
     ]
   }
 }

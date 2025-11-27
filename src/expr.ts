@@ -156,6 +156,18 @@ export abstract class SqlExpression<D extends SqlType> {
      */
     abstract toSql(grouped: boolean): string
 
+    /** Asserts this expression is text-like, throwing exception if not, and telling Typescript in the return value */
+    assertIsText(): SqlExpression<'TEXT'> {
+        if (this.type === 'TEXT' || this.type === 'VARCHAR') return this as any
+        throw new Error('Expected string-typed value, but got: ' + this.type + '; sql=' + this.toSql(false))
+    }
+
+    /** Asserts this expression is either `REAL` or `INTEGER`, throwing exception if not, and telling Typescript in the return value */
+    assertIsNumeric(): SqlExpression<'REAL' | 'INTEGER'> {
+        if (this.type === 'REAL' || this.type === 'INTEGER') return this as any
+        throw new Error('Expected numeric-typed value, but got: ' + this.type + '; sql=' + this.toSql(false))
+    }
+
     /** Boolean result of asking whether this expression is `NOT NULL` */
     isNotNull(): SqlExpression<'BOOLEAN'> { return new SqlIsNotNull(this) }
 
@@ -176,7 +188,10 @@ export abstract class SqlExpression<D extends SqlType> {
     add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs)) as any }
     sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs)) as any }
     mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('*', this as any, EXPR(rhs)) as any }
-    div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlMultiOperator<any, 'REAL'>('REAL', '/', [this, EXPR(rhs)]) }
+    div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlMultiOperator<'REAL' | 'INTEGER', 'REAL'>('REAL', '/', [this.assertIsNumeric(), EXPR(rhs)]) }
+
+    /** Boolean of whether this string includes the given string */
+    includes(substr: SqlInputValue<'TEXT'>): SqlExpression<'BOOLEAN'> { return new SqlMultiFunction<'TEXT', 'BOOLEAN'>('BOOLEAN', 'INSTR', [this.assertIsText(), EXPR(substr)]) }
 
     /** Boolean of whether this value is in the given list of values */
     inList<L extends SqlType>(list: readonly SqlInputValue<L>[]): SqlExpression<'BOOLEAN'> { return new SqlInList<D | L>(this, EXPRs(list)) }
