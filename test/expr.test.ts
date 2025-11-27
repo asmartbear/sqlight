@@ -6,6 +6,9 @@ test('integers from INT', () => {
     T.be(n.type, "INTEGER")
     T.be(n.toSql(), "123")
     T.be(n.canBeNull, false)
+    T.be(n.assertIsNumeric(), n)
+    T.throws(() => n.assertIsBoolean())
+    T.throws(() => n.assertIsText())
 })
 
 test('integers from EXPR', () => {
@@ -13,6 +16,9 @@ test('integers from EXPR', () => {
     T.be(n.type, "INTEGER")
     T.be(n.toSql(), "123")
     T.be(n.canBeNull, false)
+    T.be(n.assertIsNumeric(), n)
+    T.throws(() => n.assertIsBoolean())
+    T.throws(() => n.assertIsText())
 })
 
 test('reals from FLOAT', () => {
@@ -20,6 +26,9 @@ test('reals from FLOAT', () => {
     T.be(n.type, "REAL")
     T.be(n.toSql(), "1.23")
     T.be(n.canBeNull, false)
+    T.be(n.assertIsNumeric(), n)
+    T.throws(() => n.assertIsBoolean())
+    T.throws(() => n.assertIsText())
 })
 
 test('reals from EXPR', () => {
@@ -27,6 +36,9 @@ test('reals from EXPR', () => {
     T.be(n.type, "REAL")
     T.be(n.toSql(), "1.23")
     T.be(n.canBeNull, false)
+    T.be(n.assertIsNumeric(), n)
+    T.throws(() => n.assertIsBoolean())
+    T.throws(() => n.assertIsText())
 })
 
 test('strings', () => {
@@ -34,6 +46,9 @@ test('strings', () => {
     T.be(s.type, "TEXT")
     T.be(s.toSql(), "'foo'")
     T.be(s.canBeNull, false)
+    T.be(s.assertIsText(), s)
+    T.throws(() => s.assertIsBoolean())
+    T.throws(() => s.assertIsNumeric())
 })
 
 test('booleans', () => {
@@ -42,6 +57,9 @@ test('booleans', () => {
     T.be(s.toSql(), "TRUE")
     T.be(s.canBeNull, false)
     T.be(S.EXPR(false).toSql(), "FALSE")
+    T.be(s.assertIsBoolean(), s)
+    T.throws(() => s.assertIsNumeric())
+    T.throws(() => s.assertIsText())
 })
 
 test('dates', () => {
@@ -49,6 +67,9 @@ test('dates', () => {
     T.be(s.type, "TIMESTAMP")
     T.be(s.toSql(), "2009-02-13T23:31:30.123Z")
     T.be(s.canBeNull, false)
+    T.throws(() => s.assertIsBoolean())
+    T.throws(() => s.assertIsNumeric())
+    T.throws(() => s.assertIsText())
 })
 
 test('blobs', () => {
@@ -56,6 +77,9 @@ test('blobs', () => {
     T.be(s.type, "BLOB")
     T.be(s.toSql(), "x'68656c6c6f'")
     T.be(s.canBeNull, false)
+    T.throws(() => s.assertIsBoolean())
+    T.throws(() => s.assertIsNumeric())
+    T.throws(() => s.assertIsText())
 })
 
 test('invalid literal', () => {
@@ -119,11 +143,11 @@ test('comparisons', () => {
 
 test('add/sub/mul', () => {
     for (const op of [{
-        op: '+', f: (lhs: number, rhs: number) => S.EXPR(lhs).add(rhs),
+        op: '+', f: (lhs: number | string, rhs: number) => S.EXPR(lhs).add(rhs),
     }, {
-        op: '-', f: (lhs: number, rhs: number) => S.EXPR(lhs).sub(rhs),
+        op: '-', f: (lhs: number | string, rhs: number) => S.EXPR(lhs).sub(rhs),
     }, {
-        op: '*', f: (lhs: number, rhs: number) => S.EXPR(lhs).mul(rhs),
+        op: '*', f: (lhs: number | string, rhs: number) => S.EXPR(lhs).mul(rhs),
     }]) {
         let s = op.f(123, 456)
         T.be(s.type, "INTEGER")
@@ -148,6 +172,8 @@ test('add/sub/mul', () => {
         T.be(s.toSql(false), `1.23${op.op}4.56`)
         T.be(s.toSql(true), `(1.23${op.op}4.56)`)
         T.be(s.canBeNull, false)
+
+        T.throws(() => op.f('foo', 123))
     }
 })
 
@@ -240,15 +266,16 @@ test('includes', () => {
 test('and/or (and multi-nary operators generally)', () => {
     // Binary
     for (const op of [{
-        op: 'AND', f: (lhs: boolean, rhs: boolean) => S.BOOL(lhs).and(rhs),
+        op: 'AND', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).and(rhs),
     }, {
-        op: 'OR', f: (lhs: boolean, rhs: boolean) => S.BOOL(lhs).or(rhs),
+        op: 'OR', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).or(rhs),
     }]) {
         let s = op.f(true, false)
         T.be(s.type, "BOOLEAN")
         T.be(s.toSql(false), `TRUE ${op.op} FALSE`)
         T.be(s.toSql(true), `(TRUE ${op.op} FALSE)`)
         T.be(s.canBeNull, false)
+        T.throws(() => op.f('foo', true))
     }
 
     // Nested

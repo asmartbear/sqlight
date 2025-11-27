@@ -156,6 +156,13 @@ export abstract class SqlExpression<D extends SqlType> {
      */
     abstract toSql(grouped: boolean): string
 
+    /** Asserts this expression is boolean, throwing exception if not, and telling Typescript in the return value */
+    assertIsBoolean(): SqlExpression<'BOOLEAN'> {
+        if (this.type === 'BOOLEAN') return this as any
+        throw new Error('Expected boolean-typed value, but got: ' + this.type + '; sql=' + this.toSql(false))
+    }
+
+
     /** Asserts this expression is text-like, throwing exception if not, and telling Typescript in the return value */
     assertIsText(): SqlExpression<'TEXT'> {
         if (this.type === 'TEXT' || this.type === 'VARCHAR') return this as any
@@ -181,13 +188,13 @@ export abstract class SqlExpression<D extends SqlType> {
     gt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlMultiOperator('BOOLEAN', '>', [this, EXPR(rhs)]) }
     ge(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlMultiOperator('BOOLEAN', '>=', [this, EXPR(rhs)]) }
 
-    and(rhs: SqlInputValue<'BOOLEAN'>) { return AND(this, rhs) }
-    or(rhs: SqlInputValue<'BOOLEAN'>) { return OR(this, rhs) }
-    not() { return NOT(this) }
+    and(rhs: SqlInputValue<'BOOLEAN'>) { return AND(this.assertIsBoolean(), rhs) }
+    or(rhs: SqlInputValue<'BOOLEAN'>) { return OR(this.assertIsBoolean(), rhs) }
+    not() { return NOT(this.assertIsBoolean()) }
 
-    add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('+', this as any, EXPR(rhs)) as any }
-    sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('-', this as any, EXPR(rhs)) as any }
-    mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('*', this as any, EXPR(rhs)) as any }
+    add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('+', this.assertIsNumeric(), EXPR(rhs)) as any }
+    sub<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('-', this.assertIsNumeric(), EXPR(rhs)) as any }
+    mul<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('*', this.assertIsNumeric(), EXPR(rhs)) as any }
     div<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<'REAL'> { return new SqlMultiOperator<'REAL' | 'INTEGER', 'REAL'>('REAL', '/', [this.assertIsNumeric(), EXPR(rhs)]) }
 
     /** Boolean of whether this string includes the given string */
