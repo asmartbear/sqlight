@@ -22,6 +22,26 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
     select() {
         return new SqlSelect(this)
     }
+
+    /**
+     * Generates the SQL for creating a table from the current schema.
+     * 
+     * @param tableName the name of the table from the schema
+     * @param ifNotExists whether to include `IF NOT EXISTS` in the creation SQL
+     */
+    getCreateTableSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, ifNotExists: boolean): string {
+        let sql = 'CREATE TABLE '
+        if (ifNotExists) sql += 'IF NOT EXISTS '
+        sql += `${String(tableName)} ( `
+        sql += Object.entries(this.schema.tables[tableName].columns).map(([name, col]) => {
+            var field = `${name} ${col.type}`
+            if (!col.nullable) field += ' NOT NULL'
+            if (col.pk) field += ' PRIMARY KEY'
+            return field
+        }).join(', ')
+        sql += ' )'
+        return sql
+    }
 }
 
 /** A reference to a table with an alias. */

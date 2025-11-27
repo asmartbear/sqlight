@@ -90,3 +90,8 @@ test('WHERE x IN (subquery)', () => {
     select.where(inSub)
     T.be(select.toSql(), `SELECT 'hi' AS title\nWHERE 456 IN (SELECT 123 AS id)`)
 })
+
+test('create table SQL', () => {
+    T.eq(testSchema.getCreateTableSql('user', false), "CREATE TABLE user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
+    T.eq(testSchema.getCreateTableSql('user', true), "CREATE TABLE IF NOT EXISTS user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
+})

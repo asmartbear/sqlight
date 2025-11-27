@@ -22,6 +22,24 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         this.mutex = new Mutex()
     }
 
+    /**
+     * Creates a temporary database, executing the given function with a handle to it.
+     * Closes and deletes the database when the function exits, regardless of success or error.
+     * Passes back the return value of the function.
+     */
+    static withTemporaryDatabase<TABLES extends Record<string, SchemaTable>, U>(schema: SqlSchema<TABLES>, f: (db: SqlightDatabase<TABLES>) => Promise<U>): Promise<U> {
+        return Path.withTempFile(async (tempFile) => {
+            const db = new SqlightDatabase(schema, tempFile)
+            try {
+                return await f(db)
+            } finally {
+                try {
+                    await db.close()
+                } catch { }
+            }
+        })
+    }
+
     /** Gets a new SELECT-builder, which can then be executed against this database. */
     select() {
         return this.schema.select()
@@ -55,6 +73,14 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
                 this._db = null
             }
             return this
+        })
+    }
+
+    /** Runs arbitrary SQL as a statement, without a resultset */
+    queryStatement(sql: string): Promise<void> {
+        return this.mutex.runExclusive(async () => {
+            const db = await this.db()
+            return await db.exec(sql)
         })
     }
 
@@ -93,6 +119,11 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     /** Runs a query inside the mutex, returning the data of the named column as an array. */
     selectCol<SELECT extends SqlSelect<TABLES>, COLNAME extends SelectKeys<SELECT>>(select: SELECT, colName: COLNAME): Promise<NativeSelectRow<SELECT>[COLNAME][]> {
         return this.queryCol(select.toSql(), colName)
+    }
+
+    /** Creates a table if it doesn't already exist, using the current schema. */
+    createTable<TABLENAME extends keyof TABLES>(tableName: TABLENAME): Promise<void> {
+        return this.queryStatement(this.schema.getCreateTableSql(tableName, true))
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */

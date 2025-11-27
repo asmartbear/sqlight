@@ -50,7 +50,10 @@ export type NativeForRowColumns<RC extends RowColumns> = {
     [K in keyof RC]: NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
 };
 
-/** Defines the schema of a column, with type and whether it can be `NULL`. */
+/** 
+ * Defines the schema of a column, with type and whether it can be `NULL` (like resultset rows),
+ * as well as data needed to create it as a table, like whether has keys and indexes.
+ */
 export type SchemaColumn = RowColumn & {
     pk?: boolean,
 }
