@@ -162,7 +162,6 @@ export abstract class SqlExpression<D extends SqlType> {
         throw new Error('Expected boolean-typed value, but got: ' + this.type + '; sql=' + this.toSql(false))
     }
 
-
     /** Asserts this expression is text-like, throwing exception if not, and telling Typescript in the return value */
     assertIsText(): SqlExpression<'TEXT'> {
         if (this.type === 'TEXT' || this.type === 'VARCHAR') return this as any
