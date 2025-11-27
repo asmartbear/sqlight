@@ -379,14 +379,28 @@ export class BearSqlNote {
     }
 
     /** Opens this note in the Bear application */
-    openInBear(inNewWindow: boolean) {
+    openInBear(options: {
+        /** Create a new window, rather than opening in the main application window */
+        inNewWindow?: boolean,
+        /** Set the live search to this */
+        withSearch?: string,
+        /** Should the note be in "edit" mode, with the cursor ready to go */
+        inEditMode?: boolean,
+    }) {
         if (!this.database) throw new Error("BearSqlNote.openInBear() requires a live database.")
         // Ref: https://bear.app/faq/x-callback-url-scheme-documentation/#open-note
-        bearXCall("open-note", {
+        const qargs: Record<string, string> = {
             id: this.uniqueId,
             show_window: "yes",
-            new_window: inNewWindow ? "yes" : "no",
-        })
+            new_window: options.inNewWindow ? "yes" : "no",
+        }
+        if (options.withSearch) {
+            qargs.search = options.withSearch
+        }
+        if (options.inEditMode) {
+            qargs.edit = "yes"
+        }
+        bearXCall("open-note", qargs)
     }
 
     /**
