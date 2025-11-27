@@ -29,12 +29,14 @@ export function betterEncodeUriComponent(s: string): string {
  * Will not yield at all if the condition is already true.
  * Function can be promise-based or not
  */
-export async function busyWait<T>(msBetween: number, fIsReady: () => T | false | Nullish | Promise<T | false | Nullish>): Promise<T> {
-    while (true) {
+export async function busyWait<T>(msBetween: number, fIsReady: () => T | false | Nullish | Promise<T | false | Nullish>, timeoutMs: number = 60000): Promise<T> {
+    const tStart = Date.now()
+    while (Date.now() - tStart < timeoutMs) {
         const x = await fIsReady()
         if (x) return x
         await new Promise(resolve => setTimeout(resolve, msBetween))
     }
+    throw new Error("busyWait: timed out")
 }
 
 /**

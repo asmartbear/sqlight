@@ -293,6 +293,25 @@ export class BearSqlNote {
         this.setRawContent(BearSqlNote.createStructuredContent(this.h1, this.body, Array.from(tags), this.frontMatter), 'replace_all')
     }
 
+    /**
+     * Returns a refreshed note, with content reloaded from the database.
+     * 
+     * Use `since` to wait for notes to update based on some change we know about, whether local or remote.
+     * To do that, grab the current date before the operation in question, then use that here.
+     * 
+     * @param since if given, waits until the note shows as having been modified on or after the given time
+     */
+    async refresh(since?: Date): Promise<BearSqlNote> {
+        const db = this.database
+        if (!db) throw new Error("BearSqlNote.refresh() requires a live database.")
+        return (await db.getNotes({
+            limit: 1,
+            uniqueId: this.uniqueId,
+            modifiedAfter: since,
+            waitForNotes: since ? true : false,
+        }))[0]
+    }
+
     /** Appends content to a note, in memory and in Bear.  No other changes will be saved! */
     append(txt: string) {
         if (!this.database) throw new Error("BearSqlNote.append() requires a live database.")
@@ -302,6 +321,7 @@ export class BearSqlNote {
 
     /**
      * Adds content as a file attachment to a note. Finishes in the background.
+     * Use `this.refresh()` to continue working with note content, to ensure this is done and the body is updated.
      * 
      * @param content string or raw buffer to upload as an attachment
      * @param filename filename to use inside Bear
@@ -310,6 +330,7 @@ export class BearSqlNote {
 
     /**
      * Adds a filesystem file as an attachment to a note. Finishes in the background.
+     * Use `this.refresh()` to continue working with note content, to ensure this is done and the body is updated.
      * 
      * @param path path to the file content to upload
      * @param filename optional filename to use inside Bear; if not given, uses the file's natural name.
@@ -439,6 +460,10 @@ export type BearNoteQueryOptions = {
     includeInactive?: boolean
     /** Normally conflicted notes are ignored, but you can include them. */
     includeInConflict?: boolean
+    /** Busy-wait until there are non-zero notes that match the filter */
+    waitForNotes?: boolean
+    /** Timeout for `waitForNotes` until we give up and return an empty list anyway */
+    timeoutMs?: number
 }
 
 /** Information about a tag in Bear, */
@@ -616,8 +641,16 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
             .select('hasAttachments', notes.ZHASFILES.or(notes.ZHASIMAGES))
 
 
-        // Run the query
-        const rows = await this.selectAll(q)
+        // Run the query, possibly busy-waiting for results
+        const rows = await (
+            !options.waitForNotes ? this.selectAll(q) :
+                busyWait(100, async () => {
+                    const result = await this.selectAll(q)
+                    return result.length > 0 ? result : undefined
+                })
+        )
+
+        // Wrap the results in bear objects
         return rows.map(r => new BearSqlNote(this, r))
     }
 
@@ -648,51 +681,3 @@ export class BearSqlDatabase extends SqlightDatabase<TablesOf<typeof BearSchema>
         return this.selectCol(q, 'uid')
     }
 }
-
-// (async () => {
-//     const db = BearSqlDatabase.singleton()
-//     // console.log(await db.getTables())
-
-// Notes
-// const filter: BearNoteQueryOptions = {
-//     limit: 10,
-//     includes: "Jira",
-//     orderBy: 'newest',
-//     // modifiedAfter: new Date(2025, 10, 19),
-// }
-// const notes = await db.getNotes(filter)
-// console.log(notes.map(String))
-// console.log(await Promise.all(notes.map(x => x.getTags())))
-
-//     await notes[0].appendFile(Path.userHomeDir.join("Downloads", "skate.pdf"))
-//     await notes[0].appendFile("tacos are good", "tacos.txt")
-
-// console.log(await db.getNoteUniqueIDs(filter))
-
-//     // Attachments
-//     for (const note of notes) {
-//         for (const att of await note.getAttachments()) {
-//             console.log(att.toString())
-//         }
-//     }
-
-// Get structured information from a note
-// let note = await db.getNoteByUniqueId('008233D4-87F8-40E5-9114-E91F58E527DB')
-// invariant(note)
-// console.log(await note.getTags())
-// const frontMatter: { baz: number } = note.frontMatter as any
-// note.h1 += '!'
-// frontMatter.baz += 1
-// note.save()
-// note.append("\n" + randomUUID())
-
-// Create a note
-// const note = await db.createNote(['home'])
-// note.h1 = 'Made in test'
-// note.body = 'Something is here now!'
-// note.frontMatter.foo = 123
-// await note.save()
-
-//     await db.close()
-//     return "done"
-// })().then(console.log)
