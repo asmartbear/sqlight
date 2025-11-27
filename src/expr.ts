@@ -1,4 +1,5 @@
 import invariant from 'tiny-invariant';
+import * as D from '@asmartbear/dyn'
 import { Nullish, SqlType, NativeFor, SqlTypeFor } from './types'
 
 /**
@@ -76,6 +77,34 @@ export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer 
     if (x instanceof Date) return DATE(x)
     if (x instanceof Buffer) return BLOB(x)
     throw new Error(`Unsupported literal type: ${typeof x}: [${x}]`)
+}
+
+/**
+ * Given a specific SQL type and a native Javascript value, returns a SQL expression for a literal of that type.
+ * 
+ * In this sense it's like `EXPR()` except with an explicit type, not inferring, which can be more specific and accurate.
+ * 
+ * If `null` or `undefined` is given as the native value, creates a 'NULL' expression with the given type.
+ */
+export function LITERAL<D extends SqlType>(type: D, x: NativeFor<D> | null | undefined): SqlExpression<D> {
+    if (x === null || x === undefined) return new SqlNullLiteral(type)
+    switch (type) {
+        case 'BOOLEAN':
+            return BOOL(x as any) as any
+        case 'TEXT':
+        case 'VARCHAR':
+            return STR(x as any) as any
+        case 'INTEGER':
+            return INT(x as any) as any
+        case 'REAL':
+            return FLOAT(x as any) as any
+        case 'TIMESTAMP':
+            return DATE(x as any) as any
+        case 'BLOB':
+            return BLOB(x as any) as any
+        // istanbul ignore next
+        default: D.NEVER(type)
+    }
 }
 
 /** Expression, or undefined */
@@ -209,12 +238,17 @@ export abstract class SqlExpression<D extends SqlType> {
 /**
  * A literal (constant) value.
  */
-class SqlLiteral<D extends SqlType, T extends NativeFor<D>> extends SqlExpression<D> {
+class SqlLiteral<D extends SqlType, T extends NativeFor<D> | null> extends SqlExpression<D> {
     constructor(
         type: D,
         protected readonly value: T,
     ) { super(type, false) }
     toSql() { return String(this.value) }
+}
+
+class SqlNullLiteral<D extends SqlType> extends SqlExpression<D> {
+    constructor(type: D) { super(type, true) }
+    toSql() { return 'NULL' }
 }
 
 class SqlBooleanLiteral extends SqlLiteral<'BOOLEAN', boolean> {

@@ -1,6 +1,7 @@
+import * as D from '@asmartbear/dyn'
 import invariant from 'tiny-invariant';
 import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor } from './types'
-import { SqlExpression, SqlInputValue, EXPR, AND } from './expr'
+import { SqlExpression, SqlInputValue, EXPR, AND, LITERAL } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
 export function SCHEMA<TABLES extends Record<string, SchemaTable>>(schema: SchemaDatabase<TABLES>): SqlSchema<TABLES> {
@@ -41,6 +42,18 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         }).join(', ')
         sql += ' )'
         return sql
+    }
+
+    /** Generates the SQL for a single row of literal values, in column order, suitable for `INSERT` */
+    getInsertRowsSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
+        if (!D.NOT_EMPTY(rows)) return ""
+        const formatter = new RowFormatter(this.schema.tables[tableName].columns)
+        const data = rows.map(row => {
+            const expressions = formatter.getSqlExpressions(row)
+            return '(' + D.VALUES(expressions).map(e => e.toSql(false)).join(',') + ')'
+        })
+        const cols = '(' + formatter.getColumnList().join(',') + ')'
+        return `INSERT INTO ${String(tableName)} ${cols} VALUES\n${data.join(',\n')}`
     }
 }
 
@@ -237,4 +250,23 @@ class SqlSubquery<D extends SqlType> extends SqlExpression<D> {
         private readonly sql: string,
     ) { super(type, true) }
     toSql() { return this.sql }
+}
+
+/** Class that can format native data according to its SQL row specification. */
+class RowFormatter<COLS extends RowColumns> {
+
+    constructor(
+        public readonly columns: COLS,
+    ) {
+    }
+
+    getSqlExpressions(row: NativeForRowColumns<COLS>): { [K in keyof COLS]: SqlExpression<COLS[K]['type']> } {
+        return D.OMAP(this.columns, (col, name) =>
+            LITERAL(col.type, row[name])
+        )
+    }
+
+    getColumnList() {
+        return D.KEYS(this.columns)
+    }
 }

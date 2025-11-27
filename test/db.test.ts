@@ -42,5 +42,19 @@ test('create and query a simple table', async () =>
         // Nothing in the table
         T.eq(await db.queryAll('SELECT * FROM user'), [])
         // Insert some rows
+        const r1 = {
+            apiKey: "a1b2c3d4",
+            id: 1,
+            isAdmin: true,
+            login: "myname",
+        }
+        const r2 = {
+            apiKey: null,
+            id: 2,
+            isAdmin: false,
+            login: "yourname",
+        }
+        await db.insert('user', [r1, r2])
+        T.eq(await db.queryAll('SELECT * FROM user'), [r1, r2])
     })
 )

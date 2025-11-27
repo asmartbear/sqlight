@@ -95,3 +95,35 @@ test('create table SQL', () => {
     T.eq(testSchema.getCreateTableSql('user', false), "CREATE TABLE user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
     T.eq(testSchema.getCreateTableSql('user', true), "CREATE TABLE IF NOT EXISTS user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
 })
+
+test('insert row SQL', () => {
+    T.eq(testSchema.getInsertRowsSql("user", undefined), "")
+    T.eq(testSchema.getInsertRowsSql("user", null), "")
+    T.eq(testSchema.getInsertRowsSql("user", []), "")
+
+    T.eq(testSchema.getInsertRowsSql("user", [{
+        apiKey: "a1b2c3d4",
+        id: 123,
+        isAdmin: true,
+        login: "myname",
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname','a1b2c3d4',TRUE)")
+
+    T.eq(testSchema.getInsertRowsSql("user", [{
+        apiKey: null,
+        id: 123,
+        isAdmin: true,
+        login: "myname",
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,TRUE)", "explicit null value")
+
+    T.eq(testSchema.getInsertRowsSql("user", [{
+        apiKey: null,
+        id: 123,
+        isAdmin: true,
+        login: "myname",
+    }, {
+        apiKey: null,
+        id: 321,
+        isAdmin: false,
+        login: "yourname",
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,TRUE),\n(321,'yourname',NULL,FALSE)", "multiple rows")
+})

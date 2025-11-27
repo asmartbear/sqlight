@@ -90,6 +90,21 @@ test('invalid literal', () => {
     T.throws(() => S.EXPR({ foo: 1 } as any))
 })
 
+test('literal with type', () => {
+    T.be(S.LITERAL('BOOLEAN', false).toSql(false), "FALSE")
+    T.be(S.LITERAL('INTEGER', 123).toSql(false), "123")
+    T.be(S.LITERAL('REAL', 123).toSql(false), "123")
+    T.be(S.LITERAL('TEXT', 'foo').toSql(false), "'foo'")
+    T.be(S.LITERAL('VARCHAR', 'foo').toSql(false), "'foo'")
+    T.be(S.LITERAL('TIMESTAMP', new Date(1234567890123)).toSql(false), "2009-02-13T23:31:30.123Z")
+    T.be(S.LITERAL('BLOB', Buffer.from("hi")).toSql(false), "x'6869'")
+    // typed NULL
+    T.be(S.LITERAL('TEXT', null).toSql(false), "NULL")
+    T.be(S.LITERAL('TEXT', null).type, "TEXT")
+    T.be(S.LITERAL('INTEGER', undefined).toSql(false), "NULL")
+    T.be(S.LITERAL('INTEGER', undefined).type, "INTEGER")
+})
+
 test('TYPE', () => {
     T.be(S.TYPE(S.EXPR(123)), "INTEGER")
     T.be(S.TYPE(S.EXPR(12.3)), "REAL")

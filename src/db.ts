@@ -3,8 +3,9 @@ import { open, Database } from 'sqlite';
 import { Mutex } from 'async-mutex';
 
 import { Path } from '@asmartbear/filesystem';
+import * as D from '@asmartbear/dyn'
 
-import { SchemaTable } from './types'
+import { NativeForRowColumns, SchemaTable } from './types'
 import { SqlSchema, SqlSelect, NativeSelectRow, SelectKeys } from './schema'
 
 
@@ -124,6 +125,11 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     /** Creates a table if it doesn't already exist, using the current schema. */
     createTable<TABLENAME extends keyof TABLES>(tableName: TABLENAME): Promise<void> {
         return this.queryStatement(this.schema.getCreateTableSql(tableName, true))
+    }
+
+    /** Inserts data into a table. */
+    insert<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
+        return this.queryStatement(this.schema.getInsertRowsSql(tableName, rows))
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */
