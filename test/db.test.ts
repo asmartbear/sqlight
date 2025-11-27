@@ -45,15 +45,15 @@ test('create and query a simple table', async () =>
         const r1 = {
             apiKey: "a1b2c3d4",
             id: 1,
-            isAdmin: true,
+            isAdmin: 1,
             login: "myname",
-        }
+        } as const
         const r2 = {
             apiKey: null,
             id: 2,
-            isAdmin: false,
+            isAdmin: 0,
             login: "yourname",
-        }
+        } as const
         await db.insert('user', [r1, r2])
         T.eq(await db.queryAll('SELECT * FROM user'), [r1, r2])
     })

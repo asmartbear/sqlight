@@ -54,9 +54,10 @@ test('strings', () => {
 test('booleans', () => {
     const s = S.EXPR(true)
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(), "TRUE")
+    T.be(s.toSql(), "1")
     T.be(s.canBeNull, false)
-    T.be(S.EXPR(false).toSql(), "FALSE")
+    T.be(S.EXPR(false).toSql(), "0")
+    T.be(S.EXPR(true).toSql(), "1")
     T.be(s.assertIsBoolean(), s)
     T.throws(() => s.assertIsNumeric())
     T.throws(() => s.assertIsText())
@@ -91,7 +92,10 @@ test('invalid literal', () => {
 })
 
 test('literal with type', () => {
-    T.be(S.LITERAL('BOOLEAN', false).toSql(false), "FALSE")
+    T.be(S.LITERAL('BOOLEAN', 0).toSql(false), "0")
+    T.be(S.LITERAL('BOOLEAN', 1).toSql(false), "1")
+    T.be(S.LITERAL('BOOLEAN', false).toSql(false), "0")
+    T.be(S.LITERAL('BOOLEAN', true).toSql(false), "1")
     T.be(S.LITERAL('INTEGER', 123).toSql(false), "123")
     T.be(S.LITERAL('REAL', 123).toSql(false), "123")
     T.be(S.LITERAL('TEXT', 'foo').toSql(false), "'foo'")
@@ -99,6 +103,8 @@ test('literal with type', () => {
     T.be(S.LITERAL('TIMESTAMP', new Date(1234567890123)).toSql(false), "2009-02-13T23:31:30.123Z")
     T.be(S.LITERAL('BLOB', Buffer.from("hi")).toSql(false), "x'6869'")
     // typed NULL
+    T.be(S.LITERAL('BOOLEAN', undefined).toSql(false), "NULL")
+    T.be(S.LITERAL('BOOLEAN', null).toSql(false), "NULL")
     T.be(S.LITERAL('TEXT', null).toSql(false), "NULL")
     T.be(S.LITERAL('TEXT', null).type, "TEXT")
     T.be(S.LITERAL('INTEGER', undefined).toSql(false), "NULL")
@@ -224,8 +230,8 @@ test('div', () => {
 test('not', () => {
     const s = S.EXPR(false).not()
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), "NOT (FALSE)")
-    T.be(s.toSql(true), "(NOT (FALSE))")
+    T.be(s.toSql(false), "NOT (0)")
+    T.be(s.toSql(true), "(NOT (0))")
     T.be(s.canBeNull, false)
 })
 
@@ -281,37 +287,37 @@ test('includes', () => {
 test('and/or (and multi-nary operators generally)', () => {
     // Binary
     for (const op of [{
-        op: 'AND', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).and(rhs),
+        op: 'AND', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).and(rhs ? 1 : 0),
     }, {
-        op: 'OR', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).or(rhs),
+        op: 'OR', f: (lhs: boolean | string, rhs: boolean) => S.EXPR(lhs).or(rhs ? 1 : 0),
     }]) {
         let s = op.f(true, false)
         T.be(s.type, "BOOLEAN")
-        T.be(s.toSql(false), `TRUE ${op.op} FALSE`)
-        T.be(s.toSql(true), `(TRUE ${op.op} FALSE)`)
+        T.be(s.toSql(false), `1 ${op.op} 0`)
+        T.be(s.toSql(true), `(1 ${op.op} 0)`)
         T.be(s.canBeNull, false)
         T.throws(() => op.f('foo', true))
     }
 
     // Nested
-    let s = S.OR(S.AND(true, false), true, false)
+    let s = S.OR(S.AND(1, 0), 1, 0)
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), `(TRUE AND FALSE) OR TRUE OR FALSE`)
-    T.be(s.toSql(true), `((TRUE AND FALSE) OR TRUE OR FALSE)`)
+    T.be(s.toSql(false), `(1 AND 0) OR 1 OR 0`)
+    T.be(s.toSql(true), `((1 AND 0) OR 1 OR 0)`)
     T.be(s.canBeNull, false)
 
     // Degenerate
-    s = S.AND(true)
+    s = S.AND(1)
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), `TRUE`)
-    T.be(s.toSql(true), `TRUE`)
+    T.be(s.toSql(false), `1`)
+    T.be(s.toSql(true), `1`)
     T.be(s.canBeNull, false)
 
     // Degenerate nested
-    s = S.AND(S.OR(true, false))
+    s = S.AND(S.OR(1, 0))
     T.be(s.type, "BOOLEAN")
-    T.be(s.toSql(false), `TRUE OR FALSE`)
-    T.be(s.toSql(true), `(TRUE OR FALSE)`)
+    T.be(s.toSql(false), `1 OR 0`)
+    T.be(s.toSql(true), `(1 OR 0)`)
     T.be(s.canBeNull, false)
 })
 

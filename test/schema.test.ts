@@ -104,26 +104,26 @@ test('insert row SQL', () => {
     T.eq(testSchema.getInsertRowsSql("user", [{
         apiKey: "a1b2c3d4",
         id: 123,
-        isAdmin: true,
+        isAdmin: 1,
         login: "myname",
-    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname','a1b2c3d4',TRUE)")
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname','a1b2c3d4',1)")
 
     T.eq(testSchema.getInsertRowsSql("user", [{
         apiKey: null,
         id: 123,
-        isAdmin: true,
+        isAdmin: 1,
         login: "myname",
-    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,TRUE)", "explicit null value")
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,1)", "explicit null value")
 
     T.eq(testSchema.getInsertRowsSql("user", [{
         apiKey: null,
         id: 123,
-        isAdmin: true,
+        isAdmin: 1,
         login: "myname",
     }, {
         apiKey: null,
         id: 321,
-        isAdmin: false,
+        isAdmin: 0,
         login: "yourname",
-    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,TRUE),\n(321,'yourname',NULL,FALSE)", "multiple rows")
+    }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,1),\n(321,'yourname',NULL,0)", "multiple rows")
 })

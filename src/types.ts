@@ -8,12 +8,15 @@ export type Flatten<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 /** A data type that can be stored in a SQLite database. */
 export type SqlType = 'TEXT' | 'VARCHAR' | 'INTEGER' | 'REAL' | 'BOOLEAN' | 'TIMESTAMP' | 'BLOB'
 
+/** SQLite boolean value, which is a `0` or `1` */
+export type SqlBoolean = 0 | 1
+
 /**
  * Converts a SQL type into a native Typescript type, whether a basic SQLType
  * or a `SqlExpression` class that results in some type.
  */
 export type NativeFor<D extends SqlType> =
-    D extends 'BOOLEAN' ? boolean :
+    D extends 'BOOLEAN' ? SqlBoolean :
     D extends 'VARCHAR' ? string :
     D extends 'TEXT' ? string :
     D extends 'INTEGER' ? number :

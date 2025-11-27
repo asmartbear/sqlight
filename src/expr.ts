@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant';
 import * as D from '@asmartbear/dyn'
-import { Nullish, SqlType, NativeFor, SqlTypeFor } from './types'
+import { Nullish, SqlType, NativeFor, SqlTypeFor, SqlBoolean } from './types'
 
 /**
  * An input value to a SQL expression, either a supported native constant value or another
@@ -14,7 +14,7 @@ export type SqlInputValue<D extends SqlType> = NativeFor<D> | SqlExpression<D>;
  * the literal functions like `INT()` and `FLOAT()`.
  */
 export type SqlExprFromNative<T> =
-    T extends boolean ? SqlLiteral<'BOOLEAN', T> :
+    T extends boolean ? SqlLiteral<'BOOLEAN', SqlBoolean> :
     T extends string ? SqlLiteral<'TEXT', T> :
     T extends number ? SqlLiteral<SqlTypeFor<T>, NativeFor<SqlTypeFor<T>>> :
     T extends Date ? SqlLiteral<'TIMESTAMP', T> :
@@ -32,7 +32,7 @@ type SqlTypedGeneral<D extends SqlType> =
     readonly SqlTypedGeneral<D>[];
 
 /** A BOOLEAN-typed literal */
-export function BOOL<T extends boolean>(x: T) {
+export function BOOL<T extends boolean | SqlBoolean>(x: T) {
     return new SqlBooleanLiteral(x)
 }
 
@@ -86,11 +86,13 @@ export function EXPR(x: SqlExpression<any> | boolean | string | number | Buffer 
  * 
  * If `null` or `undefined` is given as the native value, creates a 'NULL' expression with the given type.
  */
-export function LITERAL<D extends SqlType>(type: D, x: NativeFor<D> | null | undefined): SqlExpression<D> {
+export function LITERAL(type: 'BOOLEAN', x: boolean | null | undefined): SqlExpression<'BOOLEAN'>;
+export function LITERAL<D extends SqlType>(type: D, x: NativeFor<D> | null | undefined): SqlExpression<D>;
+export function LITERAL<D extends SqlType>(type: D, x: NativeFor<D> | null | undefined | boolean): SqlExpression<D> {
     if (x === null || x === undefined) return new SqlNullLiteral(type)
     switch (type) {
         case 'BOOLEAN':
-            return BOOL(x as any) as any
+            return BOOL(x ? 1 : 0) as any
         case 'TEXT':
         case 'VARCHAR':
             return STR(x as any) as any
@@ -251,9 +253,8 @@ class SqlNullLiteral<D extends SqlType> extends SqlExpression<D> {
     toSql() { return 'NULL' }
 }
 
-class SqlBooleanLiteral extends SqlLiteral<'BOOLEAN', boolean> {
-    constructor(x: boolean) { super('BOOLEAN', x) }
-    toSql() { return this.value ? 'TRUE' : 'FALSE' }
+class SqlBooleanLiteral extends SqlLiteral<'BOOLEAN', SqlBoolean> {
+    constructor(x: boolean | 0 | 1) { super('BOOLEAN', x ? 1 : 0) }
 }
 
 class SqlStringLiteral extends SqlLiteral<'TEXT', string> {
