@@ -54,7 +54,34 @@ test('create and query a simple table', async () =>
             isAdmin: 0,
             login: "yourname",
         } as const
-        await db.insert('user', [r1, r2])
-        T.eq(await db.queryAll('SELECT * FROM user'), [r1, r2])
+        const r3 = {
+            apiKey: null,
+            id: 3,
+            isAdmin: 0,
+            login: "else",
+        } as const
+        await db.insert('user', [r1, r2, r3])
+        T.eq(await db.queryAll('SELECT * FROM user'), [r1, r2, r3])
+        // Simple select query
+        {
+            const base = db.select()
+            const u = base.from('u', 'user').col
+            let s = base
+                .passThrough(u.id)
+                .passThrough(u.isAdmin)
+                .passThrough(u.login)
+                .passThrough(u.apiKey)
+                .orderBy(u.login, 'ASC')        // different from the insertion order
+            T.eq(await db.selectAll(s), [r3, r1, r2])
+            T.eq(await db.selectOne(s), r3)
+            T.eq(await db.selectCol(s, 'id'), [3, 1, 2])
+            T.eq(await db.selectCol(s, 'login'), ["else", "myname", "yourname"])
+            // Add filter
+            s = s.where(u.login.includes('name'))
+            T.eq(await db.selectAll(s), [r1, r2])
+            T.eq(await db.selectCol(s, 'login'), ["myname", "yourname"])
+        }
+        // Close database now, so that when it's closed again, we test that closing twice doesn't matter
+        await db.close()
     })
 )

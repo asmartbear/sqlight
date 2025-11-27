@@ -146,7 +146,7 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
     /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
     select<TALIAS extends string, D extends SqlType>(alias: TALIAS, sql: SqlInputValue<D>) {
         this.selectSql.set(alias, EXPR(sql))
-        return this as SqlSelect<TABLES, NATIVEROW & { [K in TALIAS]: NativeFor<D> }>
+        return this as SqlSelect<TABLES, NATIVEROW & { [K in TALIAS]: NativeFor<D> | null }>      // always add NULL since we can't tell from typescript
     }
 
     /** Same as `select()` when we want to pass through a table column unchanged. */
@@ -196,7 +196,10 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
         return this
     }
 
-    toSql(): string {
+    toSql(options?: {
+        /** If specified, limit rows to at least this */
+        limitMax?: number,
+    }): string {
         const clauses = Array.from(this.selectSql.entries())
         if (clauses.length == 0) return 'SELECT 1'        // corner case
 
@@ -233,7 +236,8 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
         }
 
         // LIMIT/OFFSET
-        const sqlLimit = this.limit < Number.MAX_SAFE_INTEGER ? `LIMIT ${this.limit}` : ''
+        const limit = Math.min(this.limit, options?.limitMax ?? Number.MAX_SAFE_INTEGER)
+        const sqlLimit = limit < Number.MAX_SAFE_INTEGER ? `LIMIT ${limit}` : ''
         const sqlOffset = this.offset > 0 ? ` OFFSET ${this.offset}` : ''
         if (sqlLimit || sqlOffset) {
             pieces.push(sqlLimit + sqlOffset)

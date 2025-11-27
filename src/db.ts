@@ -46,24 +46,20 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         return this.schema.select()
     }
 
-    /** Gets the database object, opening connection to the database if necessary */
+    /**
+     * Gets the database object, opening connection to the database if necessary.
+     * 
+     * **Must** be called inside the mutex!
+     */
     private async db(): Promise<Database> {
-        if (!this._db) {
-            await this.open()
-            return this._db!
-        }
-        return this._db
-    }
-
-    /** Opens connection to the database, or does nothing if it's already open. */
-    private async open(): Promise<this> {
         if (!this._db) {
             this._db = await open({
                 filename: this.sqliteDatabasePath.absPath,
                 driver: sqllite3.Database,
             })
+            return this._db!
         }
-        return this
+        return this._db
     }
 
     /** Closes connection to the datbase, or does nothing if it's already closed. */
@@ -114,7 +110,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     /** Runs a query inside the mutex, returning the first row or `undefined` if no rows. */
     selectOne<SELECT extends SqlSelect<TABLES>>(select: SELECT): Promise<NativeSelectRow<SELECT> | undefined> {
         // Limits to 1, since we're selecting only one!
-        return this.queryOne(select.setLimit(1).toSql())
+        return this.queryOne(select.toSql({ limitMax: 1 }))
     }
 
     /** Runs a query inside the mutex, returning the data of the named column as an array. */
