@@ -13,13 +13,13 @@ import { Path } from '@asmartbear/filesystem';
 
 const BEAR_EPOCH = 978307200
 
-function bearTimestampToDate(ts: number): Date {
+export function bearTimestampToDate(ts: number): Date {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
     // need to add the following offset to the timestamps to get a unix timestamp
     return new Date((ts + BEAR_EPOCH) * 1000)
 }
 
-function dateToBearTimestamp(d: Date): number {
+export function dateToBearTimestamp(d: Date): number {
     // The epoch for timestamps in the Bear database is 1 Jan 2001, so we
     // need to add the following offset to the timestamps to get a unix timestamp
     return ((d.getTime() + 1) / 1000.0) - BEAR_EPOCH
