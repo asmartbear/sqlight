@@ -5,7 +5,7 @@ import { Mutex } from 'async-mutex';
 import { Path } from '@asmartbear/filesystem';
 import * as D from '@asmartbear/dyn'
 
-import { NativeForRowColumns, SchemaTable } from './types'
+import { NativeForRowColumns, NativeUpdateForSchemaColumns, SchemaTable } from './types'
 import { SqlSchema, SqlSelect, NativeSelectRow, SelectKeys } from './schema'
 
 
@@ -135,6 +135,11 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
     /** Inserts data into a table, or does nothing if the row-list is missing or empty. */
     insert<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
         return this.queryStatement(this.schema.getInsertRowsSql(tableName, rows))
+    }
+
+    /** Updates rows with a subset of their columns, based on their primary keys, or does nothing if the row-list if missing or empty. */
+    updateByPrimaryKey<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeUpdateForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
+        return this.queryStatement(this.schema.getUpdateRowsSql(tableName, rows))
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */

@@ -11,6 +11,12 @@ const testSchema = SCHEMA({
                 apiKey: { type: 'TEXT', nullable: true },
                 isAdmin: { type: 'BOOLEAN' },
             }
+        },
+        noPrimary: {
+            columns: {
+                foo: { type: 'TEXT', unique: true },
+                bar: { type: 'INTEGER' },
+            }
         }
     }
 })
@@ -126,4 +132,43 @@ test('insert row SQL', () => {
         isAdmin: 0,
         login: "yourname",
     }]), "INSERT INTO user (id,login,apiKey,isAdmin) VALUES\n(123,'myname',NULL,1),\n(321,'yourname',NULL,0)", "multiple rows")
+})
+
+test('update row SQL, with all columns and partial columns', () => {
+    T.eq(testSchema.getUpdateRowsSql("user", undefined), "")
+    T.eq(testSchema.getUpdateRowsSql("user", null), "")
+    T.eq(testSchema.getUpdateRowsSql("user", []), "")
+
+    T.eq(testSchema.getUpdateRowsSql("user", [{
+        apiKey: "a1b2c3d4",
+        id: 123,
+        isAdmin: 1,
+        login: "myname",
+    }]), "BEGIN TRANSACTION;\nUPDATE user SET apiKey='a1b2c3d4', isAdmin=1, login='myname' WHERE id=123;\nCOMMIT;")
+
+    T.eq(testSchema.getUpdateRowsSql("user", [{
+        apiKey: null,
+        id: 123,
+        isAdmin: 1,
+        login: "myname",
+    }, {
+        apiKey: null,
+        id: 321,
+        isAdmin: 0,
+        login: "yourname",
+    }]), "BEGIN TRANSACTION;\nUPDATE user SET apiKey=NULL, isAdmin=1, login='myname' WHERE id=123;\nUPDATE user SET apiKey=NULL, isAdmin=0, login='yourname' WHERE id=321;\nCOMMIT;")
+
+    T.eq(testSchema.getUpdateRowsSql("user", [{
+        id: 123,
+        isAdmin: 0,
+        login: undefined,       // one field is set to undefined; another is just missing; both should be missing from the UPDATE
+    }]), "BEGIN TRANSACTION;\nUPDATE user SET isAdmin=0 WHERE id=123;\nCOMMIT;")
+})
+
+test('update fails on tables without primary key', () => {
+    T.throws(() => testSchema.getUpdateRowsSql("noPrimary", [{
+        foo: "123",
+        bar: 321,
+    }]))
+
 })

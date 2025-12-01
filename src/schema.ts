@@ -1,6 +1,6 @@
 import * as D from '@asmartbear/dyn'
 import invariant from 'tiny-invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor } from './types'
+import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor, NativeUpdateForSchemaColumns } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND, LITERAL } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
@@ -18,6 +18,16 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
     constructor(
         public readonly schema: SchemaDatabase<TABLES>,
     ) { }
+
+    /**
+     * Gets the column name of the primary key of the table, or `undefined` if there isn't one.
+     */
+    getPrimaryKey<TABLENAME extends keyof TABLES>(tableName: TABLENAME): keyof TABLES[TABLENAME]["columns"] | undefined {
+        for (const [colName, col] of D.ENTRIES(this.schema.tables[tableName].columns)) {
+            if (col.pk) return colName
+        }
+        return undefined
+    }
 
     /** Starts a new SELECT expression. */
     select() {
@@ -45,7 +55,7 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         return sql
     }
 
-    /** Generates the SQL for a single row of literal values, in column order, suitable for `INSERT` */
+    /** Generates the SQL for inserting a set of literal-valued rows of data into a table, or empty string if rows are missing or empty. */
     getInsertRowsSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
         if (!D.NOT_EMPTY(rows)) return ""
         const formatter = new RowFormatter(this.schema.tables[tableName].columns)
@@ -55,6 +65,35 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         })
         const cols = '(' + formatter.getColumnList().join(',') + ')'
         return `INSERT INTO ${String(tableName)} ${cols} VALUES\n${data.join(',\n')}`
+    }
+
+    /** Generates the SQL for a updating rows of data with literal values, or empty string if rows are missing or empty. */
+    getUpdateRowsSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeUpdateForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
+        if (!D.NOT_EMPTY(rows)) return ""
+        const columns = this.schema.tables[tableName].columns as TABLES[TABLENAME]["columns"]
+        const pkName = this.getPrimaryKey(tableName)
+        if (!pkName) throw new Error("Cannot update a table without a primary key: " + String(tableName))
+        const statements: string[] = [
+            'BEGIN TRANSACTION;'
+        ]
+        for (const row of rows) {
+            const sets: string[] = []
+            let where: string = "ERROR"
+            D.FOREACH(row, (v, k) => {
+                if (v !== undefined) {
+                    const literal = LITERAL(columns[k].type, v)
+                    const sql = `${String(k)}=${literal.toSql(false)}`
+                    if (k == pkName) {
+                        where = sql
+                    } else {
+                        sets.push(sql)
+                    }
+                }
+            })
+            statements.push(`UPDATE ${String(tableName)} SET ${sets.join(', ')} WHERE ${where};`)
+        }
+        statements.push('COMMIT;')
+        return statements.join('\n')
     }
 }
 

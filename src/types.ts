@@ -69,9 +69,22 @@ export type SchemaColumn = RowColumn & {
     comment?: string,
 }
 
+/** A set of row-columns that defines a row of input or output. */
+export type SchemaColumns = Record<string, SchemaColumn>;
+
+/** Like `NativeForRowColumns` but for UPDATE operations, which means primary key is the only mandatory field. */
+export type NativeUpdateForSchemaColumns<RC extends SchemaColumns> =
+    {
+        [K in keyof RC as RC[K]['pk'] extends true ? K : never]:
+        NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+    } & {
+        [K in keyof RC as RC[K]['pk'] extends true ? never : K]?:
+        NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+    };
+
 /** Defines the schema of a table, with a list of columns and other table configuration. */
 export type SchemaTable = {
-    columns: Record<string, SchemaColumn>,
+    columns: SchemaColumns,
 }
 
 /** Defines an entire database, with a list of tables and other meta-data. */
