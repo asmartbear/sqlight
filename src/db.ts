@@ -73,12 +73,14 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         })
     }
 
-    /** Runs arbitrary SQL as a statement, without a resultset */
-    queryStatement(sql: string): Promise<void> {
-        return this.mutex.runExclusive(async () => {
-            const db = await this.db()
-            return await db.exec(sql)
-        })
+    /** Runs arbitrary SQL as a statement, without a resultset, or does nothing if the statement is empty */
+    async queryStatement(sql: string | D.Nullish): Promise<void> {
+        if (D.NOT_EMPTY(sql)) {
+            await this.mutex.runExclusive(async () => {
+                const db = await this.db()
+                return await db.exec(sql)
+            })
+        }
     }
 
     /** Runs an arbitrary query inside the mutex, loading all rows into memory at once. */
@@ -130,7 +132,7 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         }
     }
 
-    /** Inserts data into a table. */
+    /** Inserts data into a table, or does nothing if the row-list is missing or empty. */
     insert<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
         return this.queryStatement(this.schema.getInsertRowsSql(tableName, rows))
     }
