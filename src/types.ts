@@ -72,6 +72,12 @@ export type SchemaColumn = RowColumn & {
 /** A set of row-columns that defines a row of input or output. */
 export type SchemaColumns = Record<string, SchemaColumn>;
 
+/** A structure consisting of just the key name and key value for the primary key of a set of columns. */
+export type PrimaryKeyForSchemaColumns<RC extends SchemaColumns> = {
+    [K in keyof RC as RC[K]['pk'] extends true ? K : never]:
+    NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+}
+
 /** Like `NativeForRowColumns` but for UPDATE operations, which means primary key is the only mandatory field. */
 export type NativeUpdateForSchemaColumns<RC extends SchemaColumns> =
     {

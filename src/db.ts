@@ -5,7 +5,7 @@ import { Mutex } from 'async-mutex';
 import { Path } from '@asmartbear/filesystem';
 import * as D from '@asmartbear/dyn'
 
-import { NativeForRowColumns, NativeUpdateForSchemaColumns, SchemaTable } from './types'
+import { NativeForRowColumns, NativeUpdateForSchemaColumns, PrimaryKeyForSchemaColumns, SchemaTable } from './types'
 import { SqlSchema, SqlSelect, NativeSelectRow, SelectKeys } from './schema'
 
 
@@ -139,7 +139,12 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
 
     /** Updates rows with a subset of their columns, based on their primary keys, or does nothing if the row-list if missing or empty. */
     updateByPrimaryKey<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeUpdateForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
-        return this.queryStatement(this.schema.getUpdateRowsSql(tableName, rows))
+        return this.queryStatement(this.schema.getUpdateRowsByPkSql(tableName, rows))
+    }
+
+    /** Deletes rows based on their primary keys, or does nothing if the row-list if missing or empty. */
+    deleteByPrimaryKey<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: PrimaryKeyForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
+        return this.queryStatement(this.schema.getDeleteRowsByPkSql(tableName, rows))
     }
 
     /** Gets the list of tables in the database, along with their raw SQL creation definitions. */

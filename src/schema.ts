@@ -1,6 +1,6 @@
 import * as D from '@asmartbear/dyn'
 import invariant from 'tiny-invariant';
-import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor, NativeUpdateForSchemaColumns } from './types'
+import { Nullish, SqlType, NativeFor, SchemaColumn, SchemaTable, SchemaDatabase, RowColumns, NativeForRowColumns, Flatten, SqlTypeFor, NativeUpdateForSchemaColumns, PrimaryKeyForSchemaColumns } from './types'
 import { SqlExpression, SqlInputValue, EXPR, AND, LITERAL } from './expr'
 
 /** Converts a static schema into something Typescript understands in detail */
@@ -68,7 +68,7 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
     }
 
     /** Generates the SQL for a updating rows of data with literal values, or empty string if rows are missing or empty. */
-    getUpdateRowsSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeUpdateForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
+    getUpdateRowsByPkSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeUpdateForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
         if (!D.NOT_EMPTY(rows)) return ""
         const columns = this.schema.tables[tableName].columns as TABLES[TABLENAME]["columns"]
         const pkName = this.getPrimaryKey(tableName)
@@ -94,6 +94,17 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         }
         statements.push('COMMIT;')
         return statements.join('\n')
+    }
+
+    /** Generates SQL for deleting a set of rows by their public key, or empty string if rows are missing or empty. */
+    getDeleteRowsByPkSql<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: PrimaryKeyForSchemaColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): string {
+        if (!D.NOT_EMPTY(rows)) return ""
+        const columns = this.schema.tables[tableName].columns as TABLES[TABLENAME]["columns"]
+        const pkName = this.getPrimaryKey(tableName)
+        if (!pkName) throw new Error("Cannot update a table without a primary key: " + String(tableName))
+        const pkType = columns[pkName].type
+        const pkLiterals = rows.map(row => LITERAL(pkType, (row as any)[pkName]).toSql(false))
+        return `DELETE FROM ${String(tableName)} WHERE ${String(pkName)} IN (${pkLiterals.join(',')})`
     }
 }
 

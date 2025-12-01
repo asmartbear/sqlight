@@ -135,18 +135,18 @@ test('insert row SQL', () => {
 })
 
 test('update row SQL, with all columns and partial columns', () => {
-    T.eq(testSchema.getUpdateRowsSql("user", undefined), "")
-    T.eq(testSchema.getUpdateRowsSql("user", null), "")
-    T.eq(testSchema.getUpdateRowsSql("user", []), "")
+    T.eq(testSchema.getUpdateRowsByPkSql("user", undefined), "")
+    T.eq(testSchema.getUpdateRowsByPkSql("user", null), "")
+    T.eq(testSchema.getUpdateRowsByPkSql("user", []), "")
 
-    T.eq(testSchema.getUpdateRowsSql("user", [{
+    T.eq(testSchema.getUpdateRowsByPkSql("user", [{
         apiKey: "a1b2c3d4",
         id: 123,
         isAdmin: 1,
         login: "myname",
     }]), "BEGIN TRANSACTION;\nUPDATE user SET apiKey='a1b2c3d4', isAdmin=1, login='myname' WHERE id=123;\nCOMMIT;")
 
-    T.eq(testSchema.getUpdateRowsSql("user", [{
+    T.eq(testSchema.getUpdateRowsByPkSql("user", [{
         apiKey: null,
         id: 123,
         isAdmin: 1,
@@ -158,7 +158,7 @@ test('update row SQL, with all columns and partial columns', () => {
         login: "yourname",
     }]), "BEGIN TRANSACTION;\nUPDATE user SET apiKey=NULL, isAdmin=1, login='myname' WHERE id=123;\nUPDATE user SET apiKey=NULL, isAdmin=0, login='yourname' WHERE id=321;\nCOMMIT;")
 
-    T.eq(testSchema.getUpdateRowsSql("user", [{
+    T.eq(testSchema.getUpdateRowsByPkSql("user", [{
         id: 123,
         isAdmin: 0,
         login: undefined,       // one field is set to undefined; another is just missing; both should be missing from the UPDATE
@@ -166,9 +166,24 @@ test('update row SQL, with all columns and partial columns', () => {
 })
 
 test('update fails on tables without primary key', () => {
-    T.throws(() => testSchema.getUpdateRowsSql("noPrimary", [{
+    T.throws(() => testSchema.getUpdateRowsByPkSql("noPrimary", [{
         foo: "123",
         bar: 321,
     }]))
 
+})
+
+test('delete row SQL, by primary key', () => {
+    T.eq(testSchema.getDeleteRowsByPkSql("user", undefined), "")
+    T.eq(testSchema.getDeleteRowsByPkSql("user", null), "")
+    T.eq(testSchema.getDeleteRowsByPkSql("user", []), "")
+
+    T.eq(testSchema.getDeleteRowsByPkSql("user", [{ id: 123 }]),
+        "DELETE FROM user WHERE id IN (123)"
+    )
+    T.eq(testSchema.getDeleteRowsByPkSql("user", [{ id: 123 }, { id: 321 }]),
+        "DELETE FROM user WHERE id IN (123,321)"
+    )
+    // Fails if the table doesn't have a primary key
+    T.throws(() => testSchema.getDeleteRowsByPkSql("noPrimary", [{ foo: 123 }]))
 })

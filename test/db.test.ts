@@ -81,7 +81,7 @@ test('create and query a simple table', async () =>
         T.eq(await db.selectCol(s, 'id'), [3, 1, 2])
         T.eq(await db.selectCol(s, 'login'), ["else", "myname", "yourname"])
 
-        // Update row data
+        // Update row data by pk
         await db.updateByPrimaryKey('user', [{
             id: 3,
             login: "another"
@@ -99,6 +99,10 @@ test('create and query a simple table', async () =>
         s = s.where(u.login.includes('name'))
         T.eq(await db.selectAll(s), [r1, r2])
         T.eq(await db.selectCol(s, 'login'), ["myname", "yourname"])
+
+        // Delete a row by pk
+        await db.deleteByPrimaryKey('user', [{ id: r2.id }])
+        T.eq(await db.selectAll(s), [r1])
 
         // Close database now, so that when it's closed again, we test that closing twice doesn't matter
         await db.close()
