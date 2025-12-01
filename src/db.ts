@@ -123,6 +123,13 @@ export class SqlightDatabase<TABLES extends Record<string, SchemaTable>> {
         return this.queryStatement(this.schema.getCreateTableSql(tableName, true))
     }
 
+    /** Runs `createTable()` on all tables in the schema, in order in case order matters. */
+    async createTables(): Promise<void> {
+        for (const name of D.KEYS(this.schema.schema.tables)) {
+            await this.createTable(name)
+        }
+    }
+
     /** Inserts data into a table. */
     insert<TABLENAME extends keyof TABLES>(tableName: TABLENAME, rows: NativeForRowColumns<TABLES[TABLENAME]["columns"]>[] | D.Nullish): Promise<void> {
         return this.queryStatement(this.schema.getInsertRowsSql(tableName, rows))

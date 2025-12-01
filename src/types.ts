@@ -58,7 +58,15 @@ export type NativeForRowColumns<RC extends RowColumns> = {
  * as well as data needed to create it as a table, like whether has keys and indexes.
  */
 export type SchemaColumn = RowColumn & {
+
+    /** True if this is also a primary key constraint */
     pk?: boolean,
+
+    /** True if this column is also unique.  (Already assumed if `pk`) */
+    unique?: boolean,
+
+    /** Text comment describing the column, for a human */
+    comment?: string,
 }
 
 /** Defines the schema of a table, with a list of columns and other table configuration. */

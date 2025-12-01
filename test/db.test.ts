@@ -28,7 +28,7 @@ test('create and query a simple table', async () =>
     SqlightDatabase.withTemporaryDatabase(testSchema, async (db) => {
         // Create table
         T.eq(await db.getTables(), [], "empty database")
-        await db.createTable('user')
+        await db.createTables()
         T.eq(await db.getTables(), [{
             name: "user",
             sql: "CREATE TABLE user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )"

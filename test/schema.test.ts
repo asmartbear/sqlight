@@ -7,7 +7,7 @@ const testSchema = SCHEMA({
         user: {
             columns: {
                 id: { type: 'INTEGER', pk: true },
-                login: { type: 'TEXT' },
+                login: { type: 'TEXT', unique: true },
                 apiKey: { type: 'TEXT', nullable: true },
                 isAdmin: { type: 'BOOLEAN' },
             }
@@ -92,8 +92,8 @@ test('WHERE x IN (subquery)', () => {
 })
 
 test('create table SQL', () => {
-    T.eq(testSchema.getCreateTableSql('user', false), "CREATE TABLE user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
-    T.eq(testSchema.getCreateTableSql('user', true), "CREATE TABLE IF NOT EXISTS user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
+    T.eq(testSchema.getCreateTableSql('user', false), "CREATE TABLE user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT UNIQUE NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
+    T.eq(testSchema.getCreateTableSql('user', true), "CREATE TABLE IF NOT EXISTS user ( id INTEGER NOT NULL PRIMARY KEY, login TEXT UNIQUE NOT NULL, apiKey TEXT, isAdmin BOOLEAN NOT NULL )")
 })
 
 test('insert row SQL', () => {

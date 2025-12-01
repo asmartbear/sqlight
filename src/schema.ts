@@ -36,6 +36,7 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         sql += `${String(tableName)} ( `
         sql += Object.entries(this.schema.tables[tableName].columns).map(([name, col]) => {
             var field = `${name} ${col.type}`
+            if (col.unique) field += ' UNIQUE'
             if (!col.nullable) field += ' NOT NULL'
             if (col.pk) field += ' PRIMARY KEY'
             return field
