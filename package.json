@@ -8,8 +8,8 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "test": "jest --runInBand",
-    "watch": "npm test -- --watchAll",
-    "watch-cov": "npm test -- --watchAll --coverage",
+    "watch": "tsc && npm test -- --watchAll",
+    "watch-cov": "tsc && npm test -- --watchAll --coverage",
     "coverage": "npm test -- --coverage",
     "postcoverage": "open-cli coverage/lcov-report/index.html",
     "clean": "rimraf dist",

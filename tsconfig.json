@@ -5,6 +5,8 @@
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
     "pretty": false,
     "lib": [
       "esnext"

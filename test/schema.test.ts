@@ -24,14 +24,14 @@ const testSchema = SCHEMA({
 test('SELECT with no tables', () => {
     const select = testSchema.select()
     T.be(select.toSql(), "SELECT 1")
-    select.select('foo', 'bar')
+    select.select('foo', EXPR('bar'))
     T.be(select.toSql(), `SELECT 'bar' AS foo`)
 })
 
 test('SELECT with limit and offset', () => {
     const select = testSchema.select()
     T.be(select.toSql(), "SELECT 1")
-    select.select('foo', 'bar')
+    select.select('foo', EXPR('bar'))
     select.setLimit(10)
     T.be(select.toSql(), `SELECT 'bar' AS foo\nLIMIT 10`)
     select.setOffset(5)
@@ -40,11 +40,11 @@ test('SELECT with limit and offset', () => {
 
 test('SELECT with order by', () => {
     const select = testSchema.select()
-    select.select('foo', 'bar')
+    select.select('foo', EXPR('bar'))
     T.be(select.toSql(), `SELECT 'bar' AS foo`)
-    select.orderBy('foo', 'ASC')
+    select.orderBy(EXPR('foo'), 'ASC')
     T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC`)
-    select.orderBy('bar', 'DESC')
+    select.orderBy(EXPR('bar'), 'DESC')
     T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC, 'bar' DESC`)
     select.setLimit(10)
     T.be(select.toSql(), `SELECT 'bar' AS foo\nORDER BY 'foo' ASC, 'bar' DESC\nLIMIT 10`, "limit in the right order")
@@ -66,10 +66,11 @@ test('SELECT with single FROM', () => {
     T.be(apiKey.canBeNull, true)
     T.be(apiKey.toSql(), "u.apiKey")
 
-    select.select('myId', u.col.id)
-    select.passThrough(apiKey)
-    select.select('super', CONCAT(u.col.login, "-taco"))
-    T.be(select.toSql(), `SELECT u.id AS myId, u.apiKey AS apiKey, u.login||'-taco' AS super\nFROM user u`)
+    const q = select
+        .select('myId', u.col.id)
+        .passThrough(apiKey)
+        .select('super', CONCAT(u.col.login, "-taco"))
+    T.be(q.toSql(), `SELECT u.id AS myId, u.apiKey AS apiKey, u.login||'-taco' AS super\nFROM user u`)
 })
 
 test('SELECT with simple JOIN', () => {

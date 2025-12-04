@@ -44,7 +44,7 @@ export class SqlSchema<TABLES extends Record<string, SchemaTable>> {
         let sql = 'CREATE TABLE '
         if (ifNotExists) sql += 'IF NOT EXISTS '
         sql += `${String(tableName)} ( `
-        sql += Object.entries(this.schema.tables[tableName].columns).map(([name, col]) => {
+        sql += D.ENTRIES(this.schema.tables[tableName].columns).map(([name, col]) => {
             var field = `${name} ${col.type}`
             if (col.unique) field += ' UNIQUE'
             if (!col.nullable) field += ' NOT NULL'
@@ -195,7 +195,7 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
     }
 
     /** Sets a select clause of a given aliased name with a SQL expression, or replaces a previous one. */
-    select<TALIAS extends string, D extends SqlType>(alias: TALIAS, sql: SqlInputValue<D>) {
+    select<TALIAS extends string, D extends SqlType>(alias: TALIAS, sql: SqlExpression<D>) {
         this.selectSql.set(alias, EXPR(sql))
         return this as SqlSelect<TABLES, NATIVEROW & { [K in TALIAS]: NativeFor<D> | null }>      // always add NULL since we can't tell from typescript
     }
@@ -224,7 +224,7 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
     }
 
     /** Adds a WHERE clause with AND */
-    where(sql: SqlInputValue<'BOOLEAN'>): this {
+    where(sql: SqlExpression<'BOOLEAN'>): this {
         this.wheres.push(EXPR(sql))
         return this
     }
@@ -242,7 +242,7 @@ export class SqlSelect<TABLES extends Record<string, SchemaTable>, NATIVEROW ext
     }
 
     /** Appends another ORDER BY clause, breaking ties from the previous clauses */
-    orderBy(sql: SqlInputValue<SqlType>, ascending: 'ASC' | 'DESC'): this {
+    orderBy(sql: SqlExpression<SqlType>, ascending: 'ASC' | 'DESC'): this {
         this.orderBys.push({ value: EXPR(sql), ascending })
         return this
     }
