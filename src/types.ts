@@ -45,12 +45,16 @@ export type RowColumn = {
     nullable?: boolean,
 }
 
+/** Converts a SQL definition of a RowColumn (not just type but whether NULL) into a native Typescript type. */
+export type NativeForRowColumn<RC extends RowColumn> =
+    NativeFor<RC['type']> | (RC['nullable'] extends true ? null : never)
+
 /** A set of row-columns that defines a row of input or output. */
 export type RowColumns = Record<string, RowColumn>;
 
 /** Converts a `RowColumns` object to one of native types, used to actually send or receive row data. */
 export type NativeForRowColumns<RC extends RowColumns> = {
-    [K in keyof RC]: NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+    [K in keyof RC]: NativeForRowColumn<RC[K]>
 };
 
 /** 
@@ -74,19 +78,12 @@ export type SchemaColumns = Record<string, SchemaColumn>;
 
 /** A structure consisting of just the key name and key value for the primary key of a set of columns. */
 export type PrimaryKeyForSchemaColumns<RC extends SchemaColumns> = {
-    [K in keyof RC as RC[K]['pk'] extends true ? K : never]:
-    NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
+    [K in keyof RC as RC[K]['pk'] extends true ? K : never]: NativeForRowColumn<RC[K]>
 }
 
 /** Like `NativeForRowColumns` but for UPDATE operations, which means primary key is the only mandatory field. */
 export type NativeUpdateForSchemaColumns<RC extends SchemaColumns> =
-    {
-        [K in keyof RC as RC[K]['pk'] extends true ? K : never]:
-        NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
-    } & {
-        [K in keyof RC as RC[K]['pk'] extends true ? never : K]?:
-        NativeFor<RC[K]['type']> | (RC[K]['nullable'] extends true ? null : never)
-    };
+    Partial<NativeForRowColumns<RC>> & PrimaryKeyForSchemaColumns<RC>;
 
 /** Defines the schema of a table, with a list of columns and other table configuration. */
 export type SchemaTable = {

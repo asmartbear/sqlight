@@ -84,7 +84,7 @@ test('create and query a simple table', async () =>
         // Update row data by pk
         await db.updateByPrimaryKey('user', [{
             id: 3,
-            login: "another"
+            login: "another",
         }])
         T.eq(await db.selectOne(s), {
             ...r3,
