@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant';
 import * as D from '@asmartbear/dyn'
-import { Nullish, SqlType, NativeFor, SqlTypeFor, SqlBoolean } from './types'
+import { Nullish, SqlType, NativeFor, SqlTypeFor, SqlBoolean, SqlNullable } from './types'
 
 /**
  * An input value to a SQL expression, either a supported native constant value or another
@@ -30,6 +30,16 @@ type SqlTypedGeneral<D extends SqlType> =
     SqlExpression<D> |
     SqlTypedGeneral<D>[] |
     readonly SqlTypedGeneral<D>[];
+
+/** If any expression is nullable sometimes, returns `sometimes`; if all are `never`, returns `never`. */
+export function anySometimesNullable(list: readonly SqlExpression<any>[]): SqlNullable {
+    return list.find(el => el.nullable === 'sometimes') ? 'sometimes' : 'never'
+}
+
+/** If every expression is nullable sometimes, returns `sometimes`; if even one isn't, returns `never`. */
+export function anyNeverNullable(list: readonly SqlExpression<any>[]): SqlNullable {
+    return list.find(el => el.nullable === 'never') ? 'never' : 'sometimes'
+}
 
 /** A BOOLEAN-typed literal */
 export function BOOL<T extends boolean | SqlBoolean>(x: T) {
@@ -148,18 +158,18 @@ export function CONCAT(...list: readonly SqlInputValue<'TEXT'>[]): SqlExpression
 }
 
 /** 'AND' operator */
-export function AND(...list: readonly SqlInputValue<'BOOLEAN'>[]): SqlExpression<'BOOLEAN'> {
-    return new SqlMultiOperator('BOOLEAN', ' AND ', EXPRs(list))
+export function AND(...list: readonly SqlExpression<'BOOLEAN'>[]): SqlExpression<'BOOLEAN'> {
+    return new SqlMultiOperator('BOOLEAN', ' AND ', list)
 }
 
 /** 'OR' operator */
-export function OR(...list: readonly SqlInputValue<'BOOLEAN'>[]): SqlExpression<'BOOLEAN'> {
-    return new SqlMultiOperator('BOOLEAN', ' OR ', EXPRs(list))
+export function OR(...list: readonly SqlExpression<'BOOLEAN'>[]): SqlExpression<'BOOLEAN'> {
+    return new SqlMultiOperator('BOOLEAN', ' OR ', list)
 }
 
 /** 'NOT' operator */
-export function NOT(x: SqlInputValue<'BOOLEAN'>): SqlExpression<'BOOLEAN'> {
-    return new SqlUnaryOperator('BOOLEAN', 'NOT (', EXPR(x), ')')
+export function NOT(x: SqlExpression<'BOOLEAN'>): SqlExpression<'BOOLEAN'> {
+    return new SqlUnaryOperator('BOOLEAN', 'NOT (', x, ')')
 }
 
 /**
@@ -177,7 +187,7 @@ export function CASE<D extends SqlType>(whenList: readonly [SqlExpression<'BOOLE
 export abstract class SqlExpression<D extends SqlType> {
     constructor(
         public readonly type: D,
-        public readonly canBeNull: boolean,
+        public readonly nullable: SqlNullable,
     ) { }
 
     /**
@@ -218,8 +228,8 @@ export abstract class SqlExpression<D extends SqlType> {
     gt(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlMultiOperator('BOOLEAN', '>', [this, EXPR(rhs)]) }
     ge(rhs: SqlInputValue<D>): SqlExpression<'BOOLEAN'> { return new SqlMultiOperator('BOOLEAN', '>=', [this, EXPR(rhs)]) }
 
-    and(rhs: SqlInputValue<'BOOLEAN'>) { return AND(this.assertIsBoolean(), rhs) }
-    or(rhs: SqlInputValue<'BOOLEAN'>) { return OR(this.assertIsBoolean(), rhs) }
+    and(rhs: SqlExpression<'BOOLEAN'>) { return AND(this.assertIsBoolean(), rhs) }
+    or(rhs: SqlExpression<'BOOLEAN'>) { return OR(this.assertIsBoolean(), rhs) }
     not() { return NOT(this.assertIsBoolean()) }
 
     add<R extends 'INTEGER' | 'REAL'>(rhs: SqlInputValue<R>): SqlExpression<D extends 'INTEGER' ? (R extends 'INTEGER' ? 'INTEGER' : 'REAL') : 'REAL'> { return new SqlBinaryArithmeticOperator('+', this.assertIsNumeric(), EXPR(rhs)) as any }
@@ -244,12 +254,12 @@ class SqlLiteral<D extends SqlType, T extends NativeFor<D> | null> extends SqlEx
     constructor(
         type: D,
         protected readonly value: T,
-    ) { super(type, false) }
+    ) { super(type, 'never') }
     toSql() { return String(this.value) }
 }
 
 class SqlNullLiteral<D extends SqlType> extends SqlExpression<D> {
-    constructor(type: D) { super(type, true) }
+    constructor(type: D) { super(type, 'sometimes') }
     toSql() { return 'NULL' }
 }
 
@@ -273,12 +283,12 @@ class SqlBufferLiteral extends SqlLiteral<'BLOB', Buffer> {
 }
 
 class SqlIsNull extends SqlExpression<'BOOLEAN'> {
-    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', false) }
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', 'never') }
     toSql() { return `${this.ex.toSql(true)} IS NULL` }
 }
 
 class SqlIsNotNull extends SqlExpression<'BOOLEAN'> {
-    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', false) }
+    constructor(private readonly ex: SqlExpression<any>) { super('BOOLEAN', 'never') }
     toSql() { return `${this.ex.toSql(true)} IS NOT NULL` }
 }
 
@@ -289,7 +299,7 @@ class SqlUnaryOperator<D extends SqlType> extends SqlExpression<D> {
         private readonly prefix: string,
         private readonly x: SqlExpression<SqlType>,
         private readonly suffix: string,
-    ) { super(type, x.canBeNull) }
+    ) { super(type, x.nullable) }
 
     toSql(grouped: boolean) {
         let sql = this.prefix + this.x.toSql(false) + this.suffix
@@ -304,8 +314,8 @@ class SqlMultiOperator<INTYPE extends SqlType, OUTTYPE extends SqlType> extends 
         type: OUTTYPE,
         protected readonly op: string,
         protected readonly list: readonly SqlExpression<INTYPE>[],
-        canBeNullOverride?: boolean,     // normally we inherit from the list, but this can override it
-    ) { super(type, canBeNullOverride ?? !list.every(s => !s.canBeNull)) }
+        canBeNullOverride?: SqlNullable,     // normally we inherit from the list, but this can override it
+    ) { super(type, canBeNullOverride ?? anySometimesNullable(list)) }
 
     toSql(grouped: boolean) {
         const groupInner = grouped || this.list.length > 1
@@ -319,7 +329,7 @@ class SqlMultiOperator<INTYPE extends SqlType, OUTTYPE extends SqlType> extends 
 /** Like a multi-operator but is represented like a function. */
 export class SqlMultiFunction<INTYPE extends SqlType, OUTTYPE extends SqlType> extends SqlMultiOperator<INTYPE, OUTTYPE> {
     constructor(type: OUTTYPE, op: string, list: readonly SqlExpression<INTYPE>[],
-        canBeNullOverride?: boolean,     // normally we inherit from the list, but this can override it
+        canBeNullOverride?: SqlNullable,     // normally we inherit from the list, but this can override it
     ) { super(type, op, list, canBeNullOverride) }
 
     toSql(grouped: boolean) {
@@ -336,7 +346,7 @@ class SqlBinaryArithmeticOperator<LHS extends 'INTEGER' | 'REAL', RHS extends 'I
 
 class SqlCoalesce<D extends SqlType> extends SqlMultiFunction<D, D> {
     constructor(list: readonly SqlExpression<D>[]) {
-        super(list[0].type, 'COALESCE', list, list.every(s => s.canBeNull))
+        super(list[0].type, 'COALESCE', list, anyNeverNullable(list))
     }
 }
 
@@ -344,7 +354,7 @@ class SqlInList<D extends SqlType> extends SqlMultiFunction<D, 'BOOLEAN'> {
     constructor(
         private readonly ex: SqlExpression<D>,
         list: readonly SqlExpression<D>[],
-    ) { super('BOOLEAN', 'IN', list, false) }
+    ) { super('BOOLEAN', 'IN', list, 'never') }
 
     toSql(grouped: boolean) {
         let sql = `${this.ex.toSql(true)} ` + super.toSql(false)
@@ -357,7 +367,7 @@ class SqlInSubquery<D extends SqlType> extends SqlExpression<'BOOLEAN'> {
     constructor(
         private readonly ex: SqlExpression<D>,
         private readonly subquery: SqlExpression<D>,
-    ) { super('BOOLEAN', false) }
+    ) { super('BOOLEAN', 'never') }
 
     toSql(grouped: boolean) {
         let sql = `${this.ex.toSql(true)} IN ${this.subquery.toSql(true)}`
@@ -381,9 +391,9 @@ class SqlCase<D extends SqlType> extends SqlExpression<D> {
         }
         const type = TYPE(allValues)
         // Lack of ELSE specifically returns NULL
-        const canBeNull = (!elseExpr) ? true : !allValues.every(s => !s.canBeNull)
+        const nullable: SqlNullable = (!elseExpr) ? 'sometimes' : anySometimesNullable(allValues)
         invariant(type, "what?")
-        super(type, canBeNull)
+        super(type, nullable)
         this.allValues = allValues
     }
 

@@ -144,7 +144,7 @@ class SqlColumn<
         public readonly columnName: COLNAME,
         public readonly column: COLUMN,
     ) {
-        super(column.type, column.nullable === true)
+        super(column.type, column.nullable ? 'sometimes' : 'never')
     }
 
     toSql() { return `${this.tableAlias}.${this.columnName}` }
@@ -303,7 +303,7 @@ class SqlSubquery<D extends SqlType> extends SqlExpression<D> {
     constructor(
         type: D,
         private readonly sql: string,
-    ) { super(type, true) }
+    ) { super(type, 'sometimes') }
     toSql() { return this.sql }
 }
 

@@ -11,6 +11,9 @@ export type SqlType = 'TEXT' | 'VARCHAR' | 'INTEGER' | 'REAL' | 'BOOLEAN' | 'TIM
 /** SQLite boolean value, which is a `0` or `1` */
 export type SqlBoolean = 0 | 1
 
+/** Indicator of whether an expression can be `NULL` or not. */
+export type SqlNullable = 'sometimes' | 'never'
+
 /**
  * Converts a SQL type into a native Typescript type, whether a basic SQLType
  * or a `SqlExpression` class that results in some type.
